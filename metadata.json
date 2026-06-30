@@ -1,0 +1,10 @@
+{
+  "name": "AXON Decision Engine",
+  "description": "A serious, bilingual AI decision governance and safety engine that helps organizations evaluate and clear critical operations with native RTL Arabic and English support.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

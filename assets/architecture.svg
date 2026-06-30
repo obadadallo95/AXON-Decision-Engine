@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Gradients -->
+    <linearGradient id="primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#818CF8" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="success" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect width="100%" height="100%" fill="url(#bg)" rx="24" />
+
+  <!-- Grid -->
+  <g stroke="#334155" stroke-width="1" opacity="0.2">
+    <path d="M 0,50 L 1000,50 M 0,100 L 1000,100 M 0,150 L 1000,150 M 0,200 L 1000,200 M 0,250 L 1000,250 M 0,300 L 1000,300 M 0,350 L 1000,350" />
+    <path d="M 100,0 L 100,400 M 200,0 L 200,400 M 300,0 L 300,400 M 400,0 L 400,400 M 500,0 L 500,400 M 600,0 L 600,400 M 700,0 L 700,400 M 800,0 L 800,400 M 900,0 L 900,400" />
+  </g>
+
+  <!-- Title -->
+  <g transform="translate(40, 40)">
+    <text x="0" y="0" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="24" fill="#ffffff" letter-spacing="2">AXON SYSTEM ARCHITECTURE</text>
+    <text x="0" y="20" font-family="'Inter', sans-serif" font-weight="500" font-size="12" fill="#94A3B8">High-level interaction between Client SDK, API, and Core Kernel</text>
+  </g>
+
+  <!-- Connectors -->
+  <g fill="none" stroke-width="2" stroke-dasharray="6 4" opacity="0.6">
+    <!-- Client to API -->
+    <path d="M 180,200 L 350,200" stroke="#38BDF8">
+      <animate attributeName="stroke-dashoffset" values="10;0" dur="0.5s" repeatCount="indefinite" />
+    </path>
+    <!-- API to Kernel -->
+    <path d="M 450,200 L 620,200" stroke="#818CF8">
+      <animate attributeName="stroke-dashoffset" values="10;0" dur="0.5s" repeatCount="indefinite" />
+    </path>
+    <!-- Kernel to Database -->
+    <path d="M 720,260 L 720,310" stroke="#10B981">
+      <animate attributeName="stroke-dashoffset" values="10;0" dur="0.5s" repeatCount="indefinite" />
+    </path>
+    <!-- Kernel to AI -->
+    <path d="M 720,140 L 720,90" stroke="#FBBF24">
+      <animate attributeName="stroke-dashoffset" values="10;0" dur="0.5s" repeatCount="indefinite" />
+    </path>
+  </g>
+
+  <!-- Animated Packets -->
+  <g filter="url(#glow)">
+    <circle r="4" fill="#38BDF8">
+      <animateMotion path="M 180,200 L 350,200" dur="1.5s" repeatCount="indefinite" />
+    </circle>
+    <circle r="4" fill="#818CF8">
+      <animateMotion path="M 450,200 L 620,200" dur="1.5s" begin="0.5s" repeatCount="indefinite" />
+    </circle>
+    <circle r="4" fill="#10B981">
+      <animateMotion path="M 720,260 L 720,310" dur="1s" begin="1s" repeatCount="indefinite" />
+    </circle>
+    <circle r="4" fill="#FBBF24">
+      <animateMotion path="M 720,140 L 720,90" dur="1s" begin="1.5s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <!-- Components -->
+  
+  <!-- Client SDK Node -->
+  <g transform="translate(80, 160)">
+    <rect width="100" height="80" rx="12" fill="#0F172A" stroke="url(#accent)" stroke-width="2" />
+    <text x="50" y="35" font-family="'Inter', sans-serif" font-weight="700" font-size="14" fill="#ffffff" text-anchor="middle">Client App</text>
+    <rect x="20" y="45" width="60" height="20" rx="4" fill="#1E293B" stroke="#475569" stroke-width="1" />
+    <text x="50" y="59" font-family="'Inter', sans-serif" font-weight="600" font-size="10" fill="#38BDF8" text-anchor="middle">AXON SDK</text>
+  </g>
+
+  <!-- API Gateway Node -->
+  <g transform="translate(350, 150)">
+    <rect width="100" height="100" rx="12" fill="#0F172A" stroke="#475569" stroke-width="2" />
+    <path d="M 50,20 L 50,40 M 40,30 L 60,30" stroke="#94A3B8" stroke-width="2" />
+    <text x="50" y="65" font-family="'Inter', sans-serif" font-weight="700" font-size="14" fill="#ffffff" text-anchor="middle">API</text>
+    <text x="50" y="80" font-family="'Inter', sans-serif" font-weight="500" font-size="10" fill="#94A3B8" text-anchor="middle">Gateway</text>
+  </g>
+
+  <!-- Core Policy Kernel Node -->
+  <g transform="translate(620, 140)">
+    <rect width="200" height="120" rx="16" fill="#1E1B4B" stroke="url(#primary)" stroke-width="2" filter="url(#glow)" />
+    <text x="100" y="40" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="16" fill="#ffffff" text-anchor="middle">POLICY KERNEL</text>
+    <rect x="20" y="60" width="160" height="40" rx="6" fill="#312E81" />
+    <text x="100" y="84" font-family="'Inter', sans-serif" font-weight="600" font-size="12" fill="#A5B4FC" text-anchor="middle">Decision Engine</text>
+  </g>
+
+  <!-- AI Model Node -->
+  <g transform="translate(645, 40)">
+    <rect width="150" height="50" rx="8" fill="#451A03" stroke="#F59E0B" stroke-width="2" />
+    <text x="75" y="30" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#FBBF24" text-anchor="middle">Gemini AI Model</text>
+  </g>
+
+  <!-- Database Node -->
+  <g transform="translate(645, 310)">
+    <rect width="150" height="50" rx="8" fill="#064E3B" stroke="#10B981" stroke-width="2" />
+    <text x="75" y="30" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#34D399" text-anchor="middle">Firestore Database</text>
+  </g>
+
+</svg>

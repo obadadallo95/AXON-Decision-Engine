@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Represents an immutable record of an evaluation decision.",
+      "type": "object",
+      "properties": {
+        "prompt": { "type": "string", "description": "The evaluated system action command prompt." },
+        "category": { "type": "string", "description": "The category of operation evaluated." },
+        "timestamp": { "type": "object", "format": "date-time", "description": "Server timestamp of evaluation." },
+        "decision": { "type": "string", "enum": ["ALLOW", "DENY", "NEEDS_CLARIFICATION", "ESCALATE_TO_HUMAN"] },
+        "riskScore": { "type": "integer", "description": "Calculated risk percentage (0 to 100)." },
+        "reasonEn": { "type": "string", "description": "English explanation." },
+        "reasonAr": { "type": "string", "description": "Arabic explanation." },
+        "mitigationEn": { "type": "string", "description": "English recommended mitigation/workaround." },
+        "mitigationAr": { "type": "string", "description": "Arabic recommended mitigation/workaround." },
+        "groundingEn": { "type": "string", "description": "English grounding data." },
+        "groundingAr": { "type": "string", "description": "Arabic grounding data." },
+        "reviewerOverride": { "type": "string", "description": "Manual decision overwrite state." },
+        "reviewedBy": { "type": "string", "description": "Name of authorized reviewer." },
+        "reviewedAt": { "type": "object", "format": "date-time", "description": "Timestamp of override." }
+      },
+      "required": ["prompt", "category", "decision", "riskScore", "reasonEn", "reasonAr", "mitigationEn", "mitigationAr", "groundingEn", "groundingAr"]
+    },
+    "EscalatedItem": {
+      "title": "EscalatedItem",
+      "description": "Represents a high-risk system request requiring manual verification and clear override decisions.",
+      "type": "object",
+      "properties": {
+        "prompt": { "type": "string", "description": "The system action command prompt." },
+        "category": { "type": "string", "description": "Category of action." },
+        "timestamp": { "type": "object", "format": "date-time" },
+        "riskScore": { "type": "integer" },
+        "reasonEn": { "type": "string" },
+        "reasonAr": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "resolved"] },
+        "reviewerComment": { "type": "string" },
+        "reviewedAt": { "type": "object", "format": "date-time" }
+      },
+      "required": ["prompt", "category", "riskScore", "reasonEn", "reasonAr", "status"]
+    },
+    "SecurityPolicy": {
+      "title": "SecurityPolicy",
+      "description": "Enterprise-wide custom guardrail defined by governance admins.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Standardized policy code (e.g., R1)." },
+        "descriptionEn": { "type": "string", "description": "English operational instruction." },
+        "descriptionAr": { "type": "string", "description": "Technical Arabic version." }
+      },
+      "required": ["code", "descriptionEn", "descriptionAr"]
+    }
+  },
+  "firestore": {
+    "audit_logs": {
+      "schema": "AuditLog",
+      "description": "Immutable history of operational system actions evaluations."
+    },
+    "escalated_queue": {
+      "schema": "EscalatedItem",
+      "description": "Active tasks pending human review clearance."
+    },
+    "policies": {
+      "schema": "SecurityPolicy",
+      "description": "List of active enterprise policy guardrails."
+    }
+  }
+}
