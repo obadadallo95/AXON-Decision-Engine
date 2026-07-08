@@ -59,11 +59,12 @@ Determine the final decision:
 - NEEDS_CLARIFICATION: If the action description is vague, lacks critical parameters (like target servers, versions, or rollback strategies), or lacks enough context to make a definitive ruling.
 - ESCALATE_TO_HUMAN: If the action is high risk, requires manual review, contains a minor policy conflict that can be cleared by a Human Governance Reviewer, or is a major infrastructure upgrade that requires dual-signoff.
 
-Ensure you provide:
 1. An objective risk score from 0 to 100 representing the security risk.
 2. Explanations of reasoning in both English and Arabic.
 3. Recommended safety alternative/mitigation in both English and Arabic.
 4. Grounding evidence (quotes from Google Search or specific CVE/version facts) in both English and Arabic.
+5. The specific policy codes that were matched or violated (e.g. ["SEC-01", "DEP-02"]). If none, return empty array.
+6. A concise classification of the request type (e.g., "Database Modification", "Network Access") in both English and Arabic.
 
 The Arabic translation must be native-quality, serious, professional, and precise. Avoid direct literal translation and avoid machine-like patterns. Keep the Arabic text flow natural, highly technical, and appropriate for corporate executive huddles.
 
@@ -104,9 +105,21 @@ You MUST respond strictly with a single JSON object conforming to the specified 
             },
             groundingAr: {
               type: Type.STRING
+            },
+            matchedPolicyCodes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.STRING
+              }
+            },
+            requestClassificationEn: {
+              type: Type.STRING
+            },
+            requestClassificationAr: {
+              type: Type.STRING
             }
           },
-          required: ['decision', 'riskScore', 'reasonEn', 'reasonAr', 'mitigationEn', 'mitigationAr', 'groundingEn', 'groundingAr']
+          required: ['decision', 'riskScore', 'reasonEn', 'reasonAr', 'mitigationEn', 'mitigationAr', 'groundingEn', 'groundingAr', 'matchedPolicyCodes', 'requestClassificationEn', 'requestClassificationAr']
         }
       }
     });

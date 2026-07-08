@@ -38,9 +38,10 @@ service cloud.firestore {
     function isValidAuditLog(data) {
       return data.keys().hasAll([
         'prompt', 'category', 'decision', 'riskScore', 'reasonEn', 'reasonAr',
-        'mitigationEn', 'mitigationAr', 'groundingEn', 'groundingAr', 'timestamp'
+        'mitigationEn', 'mitigationAr', 'groundingEn', 'groundingAr', 'timestamp',
+        'citations', 'matchedPolicyCodes', 'requestClassificationEn', 'requestClassificationAr'
       ]) &&
-      data.keys().size() >= 11 &&
+      data.keys().size() >= 15 &&
       data.prompt is string && data.prompt.size() <= 5000 &&
       data.category is string && data.category.size() <= 100 &&
       data.decision is string && data.decision in ['ALLOW', 'DENY', 'NEEDS_CLARIFICATION', 'ESCALATE_TO_HUMAN'] &&
@@ -50,7 +51,11 @@ service cloud.firestore {
       data.mitigationEn is string && data.mitigationEn.size() <= 10000 &&
       data.mitigationAr is string && data.mitigationAr.size() <= 10000 &&
       data.groundingEn is string && data.groundingEn.size() <= 10000 &&
-      data.groundingAr is string && data.groundingAr.size() <= 10000;
+      data.groundingAr is string && data.groundingAr.size() <= 10000 &&
+      data.citations is list &&
+      data.matchedPolicyCodes is list &&
+      data.requestClassificationEn is string &&
+      data.requestClassificationAr is string;
     }
 
     // Validation Blueprint for Escalated Items (Pillar 2)
@@ -70,10 +75,13 @@ service cloud.firestore {
     // Validation Blueprint for Policies (Pillar 2)
     function isValidSecurityPolicy(data) {
       return data.keys().hasAll(['code', 'descriptionEn', 'descriptionAr']) &&
-      data.keys().size() == 3 &&
+      data.keys().size() >= 3 && data.keys().size() <= 6 &&
       data.code is string && data.code.size() <= 20 && data.code.matches('^[A-Z0-9]+$') &&
       data.descriptionEn is string && data.descriptionEn.size() <= 1000 &&
-      data.descriptionAr is string && data.descriptionAr.size() <= 1000;
+      data.descriptionAr is string && data.descriptionAr.size() <= 1000 &&
+      (!data.keys().contains('sourceType') || data.sourceType is string) &&
+      (!data.keys().contains('originalFilename') || data.originalFilename is string) &&
+      (!data.keys().contains('importedAt') || data.importedAt is string);
     }
 
     // 1. Audit Logs Collection Rules

@@ -30,11 +30,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = file.type || "application/pdf";
+    const fileName = file.name.toLowerCase();
+    let computedMimeType = "application/pdf";
+    let isText = false;
+    let maxSizeBytes = 10 * 1024 * 1024; // 10MB for PDF
 
+    if (fileName.endsWith('.pdf')) {
+      computedMimeType = "application/pdf";
+      maxSizeBytes = 10 * 1024 * 1024;
+    } else if (fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+      computedMimeType = "text/plain";
+      isText = true;
+      maxSizeBytes = 2 * 1024 * 1024; // 2MB for text
+    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+      computedMimeType = "text/plain";
+      isText = true;
+      maxSizeBytes = 2 * 1024 * 1024;
+    } else {
+      return NextResponse.json({ error: "Unsupported file type. Allowed: .pdf, .txt, .md, .html." }, { status: 400 });
+    }
+
+    if (file.size > maxSizeBytes) {
+      return NextResponse.json({ error: `File too large. Max size is ${maxSizeBytes / (1024*1024)}MB for this format.` }, { status: 400 });
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
     const ai = getGeminiClient();
+
+    let contents: any[] = ["Please extract all security policies and rules from this document into structured JSON."];
+
+    if (isText) {
+      const textContent = Buffer.from(arrayBuffer).toString("utf-8");
+      contents.unshift(textContent);
+    } else {
+      const base64Data = Buffer.from(arrayBuffer).toString("base64");
+      contents.unshift({
+        inlineData: {
+          data: base64Data,
+          mimeType: computedMimeType
+        }
+      });
+    }
 
     const systemInstruction = `
 You are an expert Security and Compliance Policy Extraction engine for AXON.
@@ -52,15 +88,7 @@ You must respond strictly with a JSON array conforming to the specified response
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType
-          }
-        },
-        "Please extract all security policies and rules from this document into structured JSON."
-      ],
+      contents: contents,
       config: {
         systemInstruction,
         responseMimeType: "application/json",

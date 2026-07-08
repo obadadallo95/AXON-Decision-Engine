@@ -28,7 +28,7 @@ By offloading authorization logic to AXON, your agents remain decoupled from cor
 
 ## ⚡️ Core Capabilities
 
-- **Native PDF Policy Ingestion:** Non-technical managers can directly upload their company's official security handbooks (PDFs). AXON will automatically extract, structure, and enforce the security rules using Gemini's native document comprehension capabilities.
+- **Multi-Format Policy Ingestion Pipeline:** Non-technical managers and security teams can directly upload their company's official security handbooks or structured exports (`.json`, `.pdf`, `.txt`, `.md`, `.html`). AXON will automatically extract, structure, and stage the security rules for human review before enforcing them, using Gemini's native document comprehension capabilities.
 - **Agent Integration (SDK):** Seamless integration with AI workflows via minimal SDKs and pre-built skills for Antigravity, Cursor, and Claude Code.
 - **Google Search Grounding:** Verifies facts and technical CVEs in real-time before issuing a decision.
 - **Bilingual Reasoning:** Generates objective analyses and reasoning in both English and native Arabic.

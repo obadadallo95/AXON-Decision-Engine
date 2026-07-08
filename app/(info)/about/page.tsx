@@ -42,11 +42,11 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <h3 className="text-lg font-bold text-[var(--text-main)] mt-8 mb-3">{language === 'en' ? 'Native Policy Ingestion' : 'استيراد السياسات الأصلي'}</h3>
+      <h3 className="text-lg font-bold text-[var(--text-main)] mt-8 mb-3">{language === 'en' ? 'Policy Ingestion Pipeline' : 'مسار استيراد السياسات متعدد الصيغ'}</h3>
       <p className="text-[var(--text-dim)] leading-relaxed mb-6">
         {language === 'en'
-          ? "Non-technical managers can directly upload their company's official security handbooks (PDFs). AXON automatically extracts, structures, and enforces the security rules using Gemini's native document comprehension capabilities without requiring manual data entry."
-          : "يمكن للمديرين رفع سياسات الشركة الأمنية مباشرة كملفات (PDF). يقوم أكسون تلقائياً باستخراج القوانين وهيكلتها وتطبيقها باستخدام قدرات Gemini في فهم المستندات دون الحاجة لإدخال يدوي."}
+          ? "Non-technical managers and security teams can directly upload their official handbooks, policies, or structured exports (.pdf, .txt, .md, .html, .json). AXON intelligently routes the document, extracts actionable security rules using Gemini's comprehension capabilities, and stages them for human review. Rules are never blindly activated; users must review and confirm candidates before enforcement."
+          : "يمكن لفرق الأمن والمديرين استيراد السياسات المنظمة أو المستندات المباشرة (.pdf, .txt, .md, .html, .json). يوجه أكسون الملف بذكاء، ويستخرج القواعد الأمنية، ثم يضعها في مرحلة 'المراجعة' للتأكيد من قبل العنصر البشري قبل التنفيذ الفعلي، مما يمنع تنشيط قوانين غير دقيقة."}
       </p>
 
       <h3 className="text-lg font-bold text-[var(--text-main)] mt-8 mb-3">{language === 'en' ? 'Architecture' : 'البنية'}</h3>

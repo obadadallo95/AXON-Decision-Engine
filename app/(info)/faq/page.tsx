@@ -7,7 +7,7 @@ import { useLanguage } from '../../../lib/i18n';
 const faqsEn = [
   {
     q: "How can non-technical managers add company policies to AXON?",
-    a: "Managers can simply upload their official company security handbooks or policy documents as PDF files. AXON uses Gemini's native document comprehension to automatically extract, structure, and enforce these rules without any manual coding or data entry."
+    a: "Managers can simply upload their official company security handbooks or policy documents (.json, .pdf, .txt, .md, .html). AXON uses Gemini's document and text comprehension to automatically extract and structure these rules, then presents them in a 'Candidate Review' interface for final human confirmation before enforcement."
   },
   {
     q: "What exactly does AXON decide?",
@@ -46,7 +46,7 @@ const faqsEn = [
 const faqsAr = [
   {
     q: "كيف يمكن للمديرين غير التقنيين إضافة سياسات الشركة إلى أكسون؟",
-    a: "يمكن للمديرين ببساطة رفع كتيبات الأمان الرسمية أو مستندات سياسة الشركة كملفات PDF. يستخدم أكسون قدرات Gemini في فهم المستندات لاستخراج هذه القواعد وهيكلتها وتطبيقها تلقائياً دون أي برمجة أو إدخال بيانات يدوي."
+    a: "يمكن للمديرين ببساطة رفع كتيبات الأمان الرسمية أو مستندات سياسة الشركة (.json, .pdf, .txt, .md, .html). يستخدم أكسون قدرات Gemini لاستخراج هذه القواعد وهيكلتها تلقائياً، ثم يعرضها في واجهة 'مراجعة المرشحين' للتأكيد النهائي من قبل مسؤول بشري قبل تطبيقها."
   },
   {
     q: "ما الذي يقرره أكسون بالضبط؟",

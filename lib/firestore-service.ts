@@ -24,6 +24,10 @@ export interface AuditLog {
   mitigationAr: string;
   groundingEn: string;
   groundingAr: string;
+  citations: string[];
+  matchedPolicyCodes?: string[];
+  requestClassificationEn?: string;
+  requestClassificationAr?: string;
   reviewerOverride?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: any;
@@ -46,6 +50,9 @@ export interface SecurityPolicy {
   code: string;
   descriptionEn: string;
   descriptionAr: string;
+  sourceType?: 'manual' | 'json' | 'pdf' | 'text';
+  originalFilename?: string;
+  importedAt?: string;
 }
 
 const DEFAULT_POLICIES: SecurityPolicy[] = [

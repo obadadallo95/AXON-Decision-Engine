@@ -149,6 +149,7 @@ export default function AXONDashboard() {
   // Policy tools states
   const [isSuggestingPolicy, setIsSuggestingPolicy] = useState(false);
   const [isExtractingPolicies, setIsExtractingPolicies] = useState(false);
+  const [candidatePolicies, setCandidatePolicies] = useState<SecurityPolicy[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // SDK states
@@ -269,6 +270,10 @@ export default function AXONDashboard() {
         mitigationAr: result.mitigationAr,
         groundingEn: result.groundingEn,
         groundingAr: result.groundingAr,
+        citations: result.citations || [],
+        matchedPolicyCodes: result.matchedPolicyCodes || [],
+        requestClassificationEn: result.requestClassificationEn,
+        requestClassificationAr: result.requestClassificationAr,
         reviewerOverride: null,
         reviewedBy: null
       });
@@ -353,6 +358,10 @@ export default function AXONDashboard() {
         mitigationAr: fallbackResult.mitigationAr,
         groundingEn: fallbackResult.groundingEn,
         groundingAr: fallbackResult.groundingAr,
+        citations: [],
+        matchedPolicyCodes: [],
+        requestClassificationEn: 'N/A',
+        requestClassificationAr: 'غير متوفر',
         reviewerOverride: null,
         reviewedBy: null
       });
@@ -593,48 +602,94 @@ export default function AXONDashboard() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-      setIsExtractingPolicies(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/extract-policies", {
-          method: "POST",
-          body: formData
-        });
-        if (!res.ok) throw new Error("Failed to extract policies");
-        const data = await res.json();
-        if (data.policies && Array.isArray(data.policies)) {
-          setPolicies([...data.policies, ...policies]);
-          setNotification(language === 'en' ? `Extracted ${data.policies.length} policies from PDF.` : `تم استخراج ${data.policies.length} سياسة من ملف PDF.`);
-          setTimeout(() => setNotification(''), 4000);
-        }
-      } catch (err) {
-        setNotification(language === 'en' ? "Error extracting policies from PDF." : "حدث خطأ أثناء استخراج السياسات من PDF.");
-        setTimeout(() => setNotification(''), 4000);
-      } finally {
-        setIsExtractingPolicies(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+    const fileName = file.name.toLowerCase();
+    const isPDF = fileName.endsWith('.pdf');
+    const isText = fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.html') || fileName.endsWith('.htm');
+    const isJSON = fileName.endsWith('.json');
+
+    if (!isPDF && !isText && !isJSON) {
+      setNotification(language === 'en' ? "Unsupported file type. Use .json, .pdf, .txt, .md, .html." : "نوع الملف غير مدعوم. استخدم .json, .pdf, .txt, .md, .html.");
+      setTimeout(() => setNotification(''), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target?.result as string);
-        if (Array.isArray(imported)) {
-          setPolicies([...imported, ...policies]);
-          setNotification(language === 'en' ? `Imported ${imported.length} policies.` : `تم استيراد ${imported.length} سياسات.`);
+
+    const maxSize = isPDF ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setNotification(language === 'en' ? `File too large. Max size is ${maxSize / (1024*1024)}MB.` : `حجم الملف كبير جداً. الحد الأقصى هو ${maxSize / (1024*1024)} ميغابايت.`);
+      setTimeout(() => setNotification(''), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const importedAt = new Date().toISOString();
+
+    if (isJSON) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target?.result as string);
+          if (Array.isArray(imported)) {
+            const enriched = imported.map((p: any) => ({
+              ...p,
+              sourceType: 'json',
+              originalFilename: file.name,
+              importedAt
+            }));
+            setCandidatePolicies(enriched);
+            setNotification(language === 'en' ? `Parsed ${imported.length} policies from JSON. Please review.` : `تم تحليل ${imported.length} سياسات من JSON. يرجى المراجعة.`);
+            setTimeout(() => setNotification(''), 4000);
+          }
+        } catch (err) {
+          setNotification(language === 'en' ? "Invalid JSON file format." : "تنسيق ملف JSON غير صالح.");
           setTimeout(() => setNotification(''), 4000);
         }
-      } catch (err) {
-        setNotification(language === 'en' ? "Invalid JSON file format." : "تنسيق ملف JSON غير صالح.");
+      };
+      reader.readAsText(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Handle PDF and Text via API
+    setIsExtractingPolicies(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/extract-policies", {
+        method: "POST",
+        body: formData
+      });
+      if (!res.ok) throw new Error("Failed to extract policies");
+      const data = await res.json();
+      if (data.policies && Array.isArray(data.policies)) {
+        const enriched = data.policies.map((p: any) => ({
+          ...p,
+          sourceType: isPDF ? 'pdf' : 'text',
+          originalFilename: file.name,
+          importedAt
+        }));
+        setCandidatePolicies(enriched);
+        setNotification(language === 'en' ? `Extracted ${data.policies.length} policies. Please review.` : `تم استخراج ${data.policies.length} سياسة. يرجى المراجعة.`);
         setTimeout(() => setNotification(''), 4000);
       }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      setNotification(language === 'en' ? "Error extracting policies from document." : "حدث خطأ أثناء استخراج السياسات من المستند.");
+      setTimeout(() => setNotification(''), 4000);
+    } finally {
+      setIsExtractingPolicies(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const confirmCandidatePolicies = () => {
+    setPolicies([...candidatePolicies, ...policies]);
+    setCandidatePolicies([]);
+    setNotification(language === 'en' ? "Policies activated successfully. Don't forget to save changes." : "تم تنشيط السياسات بنجاح. لا تنس حفظ التغييرات.");
+    setTimeout(() => setNotification(''), 4000);
+  };
+
+  const cancelCandidatePolicies = () => {
+    setCandidatePolicies([]);
   };
 
   // Get status color utilities
@@ -1200,6 +1255,40 @@ export default function AXONDashboard() {
                     </div>
                   </div>
 
+                  {/* Decision Trace / Evidence Panel */}
+                  <div className="space-y-1.5 pt-2">
+                    <h4 className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                      {language === 'en' ? 'Decision Trace & Evidence' : 'تتبع مسار القرار والأدلة'}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Classification' : 'تصنيف الطلب'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate" title={language === 'en' ? activeAnalysis.requestClassificationEn : activeAnalysis.requestClassificationAr}>
+                          {language === 'en' ? (activeAnalysis.requestClassificationEn || 'Unknown') : (activeAnalysis.requestClassificationAr || 'غير معروف')}
+                        </span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Matched Policies' : 'السياسات المطابقة'}</span>
+                        <span className="font-semibold text-indigo-400 truncate" title={(activeAnalysis.matchedPolicyCodes || []).join(', ')}>
+                          {(activeAnalysis.matchedPolicyCodes || []).length > 0 ? (activeAnalysis.matchedPolicyCodes || []).join(', ') : 'None'}
+                        </span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Search Grounding' : 'البحث الميداني'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate">
+                          {(activeAnalysis.citations && activeAnalysis.citations.length > 0) ? (language === 'en' ? 'Utilized' : 'مستخدم') : (language === 'en' ? 'Not Required' : 'غير مطلوب')}
+                        </span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Human Review' : 'المراجعة البشرية'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate">
+                          {activeAnalysis.decision === 'ESCALATE_TO_HUMAN' ? (language === 'en' ? 'Required' : 'مطلوب') : (language === 'en' ? 'Bypassed' : 'تم التجاوز')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Primary Reason details */}
                   <div className="space-y-1.5">
                     <h4 className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
@@ -1408,8 +1497,8 @@ export default function AXONDashboard() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {policies.map((pol) => {
-                                // Simulate that the policies related to current category might have warnings
-                                const isViolated = pol.code.toLowerCase().includes(category.toLowerCase()) || (pol.code === 'DEP-01' && category === 'dependency');
+                                const matchedCodes = activeAnalysis.matchedPolicyCodes || [];
+                                const isViolated = matchedCodes.includes(pol.code);
                                 return (
                                   <div 
                                     key={pol.code} 
@@ -1830,7 +1919,7 @@ export default function AXONDashboard() {
                     <div>
                       <input 
                         type="file" 
-                        accept=".json,.pdf" 
+                        accept=".json,.pdf,.txt,.md,.html" 
                         ref={fileInputRef} 
                         onChange={handleImportPolicies} 
                         className="hidden" 
@@ -1846,12 +1935,58 @@ export default function AXONDashboard() {
                           <Upload className="w-3.5 h-3.5" />
                         )}
                         {language === 'en' 
-                          ? (isExtractingPolicies ? 'Extracting...' : 'Bulk Import (JSON/PDF)') 
-                          : (isExtractingPolicies ? 'جاري الاستخراج...' : 'استيراد شامل (JSON/PDF)')}
+                          ? (isExtractingPolicies ? 'Processing...' : 'Import Policies') 
+                          : (isExtractingPolicies ? 'جاري المعالجة...' : 'استيراد السياسات')}
                       </button>
                     </div>
                   </div>
                 </div>
+
+                {candidatePolicies.length > 0 && (
+                  <div className="mb-6 p-4 rounded-lg bg-[var(--bg-surface)] border border-[#6366F1]/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-[#6366F1]" />
+                          {language === 'en' ? 'Candidate Policies Pending Review' : 'سياسات مرشحة بانتظار المراجعة'}
+                        </h3>
+                        <p className="text-xs text-[var(--text-dim)] mt-1">
+                          {language === 'en' 
+                            ? `Please review the ${candidatePolicies.length} policies extracted from ${candidatePolicies[0]?.originalFilename || 'the file'} before activating them.` 
+                            : `يرجى مراجعة ${candidatePolicies.length} سياسات مستخرجة قبل تنشيطها.`}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={cancelCandidatePolicies}
+                          className="px-3 py-1.5 bg-[var(--bg-input)] hover:bg-[var(--bg-active)] text-[var(--text-main)] border border-[var(--border-input)] rounded-lg text-xs font-bold transition-all"
+                        >
+                          {language === 'en' ? 'Cancel' : 'إلغاء'}
+                        </button>
+                        <button
+                          onClick={confirmCandidatePolicies}
+                          className="px-3 py-1.5 bg-[#6366F1] hover:bg-[#5355c9] text-white rounded-lg text-xs font-bold transition-all"
+                        >
+                          {language === 'en' ? 'Confirm & Activate' : 'تأكيد وتنشيط'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {candidatePolicies.map((p, idx) => (
+                        <div key={`candidate-${idx}`} className="p-3 bg-[var(--bg-card)] border border-[var(--border-input)] rounded-md flex justify-between items-start">
+                          <div className="w-full">
+                            <div className="flex justify-between w-full mb-1">
+                              <span className="text-[10px] uppercase font-bold text-[#6366F1] block">[{p.sourceType}] {p.code}</span>
+                            </div>
+                            <p className="text-xs text-[var(--text-main)]">{p.descriptionEn}</p>
+                            <p className="text-xs text-[var(--text-dim)] mt-1" dir="rtl">{p.descriptionAr}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   <div className="md:col-span-3">
