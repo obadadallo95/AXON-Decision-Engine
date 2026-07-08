@@ -79,9 +79,9 @@ service cloud.firestore {
       data.code is string && data.code.size() <= 20 && data.code.matches('^[A-Z0-9]+$') &&
       data.descriptionEn is string && data.descriptionEn.size() <= 1000 &&
       data.descriptionAr is string && data.descriptionAr.size() <= 1000 &&
-      (!data.keys().contains('sourceType') || data.sourceType is string) &&
-      (!data.keys().contains('originalFilename') || data.originalFilename is string) &&
-      (!data.keys().contains('importedAt') || data.importedAt is string);
+      (!('sourceType' in data) || data.sourceType is string) &&
+      (!('originalFilename' in data) || data.originalFilename is string) &&
+      (!('importedAt' in data) || data.importedAt is string);
     }
 
     // 1. Audit Logs Collection Rules

@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "database": "ai-studio-axondecisionengi-707ad9fc-36bf-45c4-8fd5-70dad9f972c0"
+  }
+}
