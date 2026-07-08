@@ -24,6 +24,15 @@ function getGeminiClient(): GoogleGenAI {
 
 export async function POST(req: NextRequest) {
   try {
+    // Basic API Key Auth for external SDK usage
+    const expectedKey = process.env.AXON_API_KEY;
+    if (expectedKey) {
+      const authHeader = req.headers.get("authorization");
+      if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
+        return NextResponse.json({ error: "Unauthorized: Invalid or missing API Key." }, { status: 401 });
+      }
+    }
+
     const { prompt, policies } = await req.json();
 
     if (!prompt) {

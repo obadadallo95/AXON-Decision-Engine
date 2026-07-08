@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   Shield, 
   Terminal, 
@@ -13,7 +14,8 @@ import {
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
-  HelpCircle, 
+  HelpCircle,
+  MessageCircleQuestion, 
   ArrowRight, 
   Plus, 
   Trash, 
@@ -146,6 +148,7 @@ export default function AXONDashboard() {
   
   // Policy tools states
   const [isSuggestingPolicy, setIsSuggestingPolicy] = useState(false);
+  const [isExtractingPolicies, setIsExtractingPolicies] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // SDK states
@@ -586,9 +589,35 @@ export default function AXONDashboard() {
     }, 1500);
   };
 
-  const handleImportPolicies = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportPolicies = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      setIsExtractingPolicies(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/extract-policies", {
+          method: "POST",
+          body: formData
+        });
+        if (!res.ok) throw new Error("Failed to extract policies");
+        const data = await res.json();
+        if (data.policies && Array.isArray(data.policies)) {
+          setPolicies([...data.policies, ...policies]);
+          setNotification(language === 'en' ? `Extracted ${data.policies.length} policies from PDF.` : `تم استخراج ${data.policies.length} سياسة من ملف PDF.`);
+          setTimeout(() => setNotification(''), 4000);
+        }
+      } catch (err) {
+        setNotification(language === 'en' ? "Error extracting policies from PDF." : "حدث خطأ أثناء استخراج السياسات من PDF.");
+        setTimeout(() => setNotification(''), 4000);
+      } finally {
+        setIsExtractingPolicies(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+      return;
+    }
     
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -759,7 +788,33 @@ export default function AXONDashboard() {
               <Terminal className="w-4.5 h-4.5" />
               {t.sdkIntegration || 'SDK Integration'}
             </button>
-          </nav>
+          
+            
+            {/* Secondary Navigation */}
+            <div className="pt-4 mt-4 border-t border-[var(--border-subtle)] space-y-1">
+              <Link 
+                href="/about"
+                className="w-full text-left px-6 py-3 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all text-[var(--text-dim)] hover:bg-[var(--bg-nav-hover)] hover:text-[#F3F4F6]"
+              >
+                <HelpCircle className="w-4.5 h-4.5" />
+                {language === 'en' ? 'About AXON' : 'حول أكسون'}
+              </Link>
+              <Link 
+                href="/skills"
+                className="w-full text-left px-6 py-3 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all text-[var(--text-dim)] hover:bg-[var(--bg-nav-hover)] hover:text-[#F3F4F6]"
+              >
+                <Code className="w-4.5 h-4.5" />
+                {language === 'en' ? 'Integration Skills' : 'مهارات التكامل'}
+              </Link>
+              <Link 
+                href="/faq"
+                className="w-full text-left px-6 py-3 flex items-center gap-3 text-xs font-semibold tracking-wide transition-all text-[var(--text-dim)] hover:bg-[var(--bg-nav-hover)] hover:text-[#F3F4F6]"
+              >
+                <MessageCircleQuestion className="w-4.5 h-4.5" />
+                {language === 'en' ? 'FAQ' : 'الأسئلة الشائعة'}
+              </Link>
+            </div>
+</nav>
         </div>
 
         {/* PROFILE SIMULATOR CONTROLLER */}
@@ -1248,72 +1303,7 @@ export default function AXONDashboard() {
                     </span>
                   </div>
 
-                  <div className="flex flex-col gap-3">
-                    {/* Force Clear Cache Button */}
-                    <button
-                      onClick={handleClearCache}
-                      disabled={isClearingCache || systemHalted}
-                      className="w-full text-left p-3 rounded-xl border border-[var(--border-subtle)]/60 hover:border-[var(--border-bold)] hover:bg-[var(--bg-nav-hover)]/60 text-xs transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <RefreshCw className={`w-4 h-4 text-[#818CF8] ${isClearingCache ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                        <div className="flex flex-col">
-                          <span className="font-bold text-[var(--text-main)] text-[11px]">
-                            {language === 'en' ? 'Force Clear Cache' : 'مسح الذاكرة المؤقتة'}
-                          </span>
-                          <span className="text-[9px] text-[var(--text-light)] font-medium">
-                            {language === 'en' ? 'Invalidate engine memory' : 'تفريغ الذاكرة للمحرك'}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Verify Compliance Ledger Button */}
-                    <button
-                      onClick={handleVerifyLedger}
-                      disabled={isVerifyingLedger}
-                      className="w-full text-left p-3 rounded-xl border border-[var(--border-subtle)]/60 hover:border-[var(--border-bold)] hover:bg-[var(--bg-nav-hover)]/60 text-xs transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <UserCheck className={`w-4 h-4 text-[#818CF8] ${isVerifyingLedger ? 'animate-pulse' : ''}`} />
-                        <div className="flex flex-col">
-                          <span className="font-bold text-[var(--text-main)] text-[11px]">
-                            {language === 'en' ? 'Verify Ledger Integrity' : 'التحقق من السجل'}
-                          </span>
-                          <span className="text-[9px] text-[var(--text-light)] font-medium">
-                            {language === 'en' ? 'Run cryptographic checksum' : 'المراجعة التشفيرية للبيانات'}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Emergency System Halt Button */}
-                    <button
-                      onClick={handleToggleHalt}
-                      className={`w-full text-left p-3 rounded-xl border text-xs transition-all flex items-center justify-between group cursor-pointer ${
-                        systemHalted 
-                          ? 'border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/5' 
-                          : 'border-rose-500/20 hover:border-rose-500/40 hover:bg-rose-500/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <AlertTriangle className={`w-4 h-4 ${systemHalted ? 'text-emerald-400 animate-pulse' : 'text-rose-400'}`} />
-                        <div className="flex flex-col">
-                          <span className={`font-bold text-[11px] ${systemHalted ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {systemHalted 
-                              ? (language === 'en' ? 'Resume Security Engine' : 'استئناف تشغيل المحرك') 
-                              : (language === 'en' ? 'Emergency System Halt' : 'إيقاف طارئ للنظام')}
-                          </span>
-                          <span className="text-[9px] text-[var(--text-light)] font-medium">
-                            {systemHalted 
-                              ? (language === 'en' ? 'Restart normal operations' : 'إعادة تشغيل العمليات') 
-                              : (language === 'en' ? 'Kill all active evaluations' : 'إيقاف فوري لعمليات التقييم')}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
                   </div>
-                </div>
 
                 <div className="text-[10px] text-[var(--text-light)] leading-relaxed font-medium">
                   {language === 'en'
@@ -1836,28 +1826,28 @@ export default function AXONDashboard() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={handleSuggestPolicy}
-                      disabled={isSuggestingPolicy}
-                      className="px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-[#818CF8] border border-indigo-500/20 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {isSuggestingPolicy ? (language === 'en' ? 'Analyzing...' : 'جاري التحليل...') : (language === 'en' ? 'Suggest Policy' : 'اقتراح سياسة')}
-                    </button>
+                    
                     <div>
                       <input 
                         type="file" 
-                        accept=".json" 
+                        accept=".json,.pdf" 
                         ref={fileInputRef} 
                         onChange={handleImportPolicies} 
                         className="hidden" 
                       />
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-2 bg-[var(--bg-input)] hover:bg-[var(--bg-active)] text-[var(--text-main)] border border-[var(--border-input)] rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+                        disabled={isExtractingPolicies}
+                        className="px-3 py-2 bg-[var(--bg-input)] hover:bg-[var(--bg-active)] text-[var(--text-main)] border border-[var(--border-input)] rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Upload className="w-3.5 h-3.5" />
-                        {language === 'en' ? 'Bulk Import' : 'استيراد شامل'}
+                        {isExtractingPolicies ? (
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[var(--text-main)] border-t-transparent animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        {language === 'en' 
+                          ? (isExtractingPolicies ? 'Extracting...' : 'Bulk Import (JSON/PDF)') 
+                          : (isExtractingPolicies ? 'جاري الاستخراج...' : 'استيراد شامل (JSON/PDF)')}
                       </button>
                     </div>
                   </div>
@@ -2557,7 +2547,7 @@ Authorization: Bearer <span className="text-[#818CF8]">axn_live_xxxxxxxxxxxxxxxx
         </div>
 
         {/* FLOATING MOBILE BOTTOM SHEET NAVIGATION */}
-        <div className="lg:hidden fixed bottom-4 left-4 right-4 md:left-6 md:right-6 max-w-lg mx-auto bg-[var(--bg-surface)]/90 border border-[var(--border-panel)] shadow-[0_12px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl rounded-2xl p-1.5 z-40 flex items-center justify-between transition-all duration-300">
+        <div className="lg:hidden fixed bottom-4 left-4 right-4 md:left-6 md:right-6 max-w-lg mx-auto bg-[var(--bg-surface)]/90 border border-[var(--border-panel)] shadow-[0_12px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl rounded-2xl p-1.5 z-40 flex items-center justify-between overflow-x-auto hide-scrollbar gap-1 transition-all duration-300">
           <button 
             onClick={() => setActiveTab('workspace')}
             className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl flex-1 text-center transition-all cursor-pointer relative ${
@@ -2656,6 +2646,39 @@ Authorization: Bearer <span className="text-[#818CF8]">axn_live_xxxxxxxxxxxxxxxx
               <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#818CF8]"></span>
             )}
           </button>
+
+          <div className="w-px h-8 bg-[var(--border-panel)] mx-1 flex-shrink-0"></div>
+          
+          
+          <Link 
+            href="/about"
+            className="flex flex-col items-center justify-center py-2 px-3 rounded-xl flex-shrink-0 min-w-[64px] text-center transition-all cursor-pointer relative text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)]/50"
+          >
+            <HelpCircle className="w-5 h-5 transition-transform duration-200 text-[var(--text-muted)]" />
+            <span className="text-[9px] font-black tracking-wider uppercase mt-1 text-[var(--text-dim)]">
+              {language === 'en' ? 'About' : 'حول'}
+            </span>
+          </Link>
+
+          <Link 
+            href="/skills"
+            className="flex flex-col items-center justify-center py-2 px-3 rounded-xl flex-shrink-0 min-w-[64px] text-center transition-all cursor-pointer relative text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)]/50"
+          >
+            <Code className="w-5 h-5 transition-transform duration-200 text-[var(--text-muted)]" />
+            <span className="text-[9px] font-black tracking-wider uppercase mt-1 text-[var(--text-dim)]">
+              {language === 'en' ? 'Skills' : 'مهارات'}
+            </span>
+          </Link>
+
+          <Link 
+            href="/faq"
+            className="flex flex-col items-center justify-center py-2 px-3 rounded-xl flex-shrink-0 min-w-[64px] text-center transition-all cursor-pointer relative text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)]/50"
+          >
+            <MessageCircleQuestion className="w-5 h-5 transition-transform duration-200 text-[var(--text-muted)]" />
+            <span className="text-[9px] font-black tracking-wider uppercase mt-1 text-[var(--text-dim)]">
+              {language === 'en' ? 'FAQ' : 'أسئلة'}
+            </span>
+          </Link>
         </div>
 
       </main>

@@ -12,121 +12,188 @@
   <img src="https://img.shields.io/badge/Bilingual-EN%20%7C%20AR-059669?style=for-the-badge" alt="Bilingual" />
 </p>
 
-> **"Can you build an AI system that knows when it is allowed to act?"**
+> **"Can you build an AI system that knows when it is allowed to act?"**  
+> — *DOO Builders League Challenge: The Decision Engine*
 
-## Professional Overview
+## Overview
 
-**AXON** is a production-quality, bilingual security governance and operational decision safety engine. It empowers high-integrity organizations to evaluate, safeguard, and audit critical infrastructure actions—such as software dependency upgrades, database schema modifications, server access provisioning, and emergency patches—against rigorous compliance policies before execution.
+**AXON** is an operational decision safety engine. It acts as an external policy verification layer for autonomous AI agents (such as Cursor, Claude Code, and Antigravity) and automated infrastructure pipelines.
 
-By serving as a continuous policy verification kernel, AXON acts as the ultimate gatekeeper for autonomous or semi-autonomous infrastructure changes, ensuring that every action is grounded in approved corporate governance.
+Rather than offering conversational interfaces, AXON serves a single purpose: **deterministic action verification**. It evaluates requested actions against live organizational policies using Google's Gemini models and web grounding, and deterministically decides if the system should proceed.
 
-AXON features native dual-language support in English and Arabic, maintaining high-fidelity Right-to-Left (RTL) design, localized native technical copy, integrated speech-to-text voice input, and robust multi-role simulation flows.
+### Why AXON Matters
+Modern AI agents have powerful capabilities to write code, install dependencies, and run terminal commands. However, they lack institutional awareness. They do not naturally know if a specific package is forbidden by your company's security policy, or if modifying a database schema requires senior engineering review. 
 
----
+By offloading authorization logic to AXON, your agents remain decoupled from corporate governance rules, while AXON maintains an objective verification record. 
 
-## System Architecture
+## ⚡️ Core Capabilities
 
-AXON connects client operations with robust policy enforcement. The diagram below illustrates the flow from the client SDK down to the Core Policy Kernel and Gemini AI Model.
+- **Native PDF Policy Ingestion:** Non-technical managers can directly upload their company's official security handbooks (PDFs). AXON will automatically extract, structure, and enforce the security rules using Gemini's native document comprehension capabilities.
+- **Agent Integration (SDK):** Seamless integration with AI workflows via minimal SDKs and pre-built skills for Antigravity, Cursor, and Claude Code.
+- **Google Search Grounding:** Verifies facts and technical CVEs in real-time before issuing a decision.
+- **Bilingual Reasoning:** Generates objective analyses and reasoning in both English and native Arabic.
 
-<p align="center">
-  <img src="assets/architecture.svg" alt="AXON System Architecture" width="100%">
-</p>
+## The Decision Output
 
-## Core Architectural Pillars
-
-1. **AI Decision Safety Kernel**: Integrates the state-of-the-art Google Gemini model with Google Search Grounding to evaluate actions against defined organizational policies, producing transparent ALLOW, DENY, NEEDS_CLARIFICATION, or ESCALATE_TO_HUMAN rulings with technical explanations.
-2. **Operational Guardrails Manager**: Direct, hot-deployable policy definitions written securely in Firestore or local client storage.
-3. **Bilingual Dual-Pane Alignment**: Built with an absolute commitment to linguistic accuracy, avoiding machine-style translation in favor of corporate-grade, technical Arabic.
-4. **Governance Reviewer Workflow**: Simulates an authorized override and dual-signoff flow for items flagged for human escalation.
-5. **Durable Cloud Audit Trial**: Synchronizes historical runs to Google Cloud Firestore with real-time state tracking and fail-safe offline persistence.
-6. **Agent SDK**: Provides a drop-in Node.js/TypeScript SDK for other AI agents (like Copilot, Cloud Code, Antigravity) to evaluate action safety programmatically.
-
----
-
-## Directory Structure
-
-```
-├── app/
-│   ├── api/
-│   │   └── decide/
-│   │       └── route.ts         # Server-side Gemini & Google Search Grounding API
-│   ├── globals.css              # Tailwind v4 theme and custom variables
-│   ├── layout.tsx               # Root Layout with Inter font & Context wrappers
-│   └── page.tsx                 # Main interactive AXON governance workspace
-├── docs/
-│   ├── overview.md              # Detailed technical design & decision logic
-│   └── sdk-reference.md         # Documentation for the AXON Developer SDK
-├── hooks/
-│   └── use-speech.ts            # Web Speech API recognition interface hook
-├── lib/
-│   ├── axon-sdk.ts              # Agent SDK entry point and class definitions
-│   ├── auth-context.tsx         # User simulation profile provider (Operator / Reviewer)
-│   ├── firebase.ts              # Lazy Firebase SDK connection with sandbox fallback
-│   ├── firestore-service.ts     # Firestore DB queries and LocalStorage failover
-│   ├── i18n.tsx                 # Localization definitions and RTL controller
-│   ├── scenarios.ts             # Predefined compliance testing scenarios
-│   └── utils.ts                 # Tailwind utility helpers
-├── metadata.json                # App permissions, name, and capabilities configuration
-├── package.json                 # Project dependencies & build instructions
-├── postcss.config.mjs           # PostCSS Tailwind config
-├── tsconfig.json                # TypeScript configuration
-├── PRIVACY.md                   # Enterprise data privacy and security policy
-└── TERMS.md                     # Terms of service and governance liability disclaimer
-```
+Every request sent to AXON yields one of four strict states, along with technical reasoning and mitigation strategies:
+- `ALLOW`: Action complies with policy. Proceed.
+- `DENY`: Action severely violates policy. Execution halted.
+- `NEEDS_CLARIFICATION`: Policy is ambiguous regarding the request. Requires user context.
+- `ESCALATE_TO_HUMAN`: High-risk action detected. Agent must defer to human execution.
 
 ---
 
-## Installation & Development
+## 🧭 Demo Path
+
+To quickly evaluate the core Decision Engine, follow these steps:
+1. **Open the Workspace:** Launch the local server and navigate to `http://localhost:3000`.
+2. **Run a Safe Request:** Use the Live Simulator or API to request `npm install react`. Verify it returns `ALLOW`.
+3. **Run a Risky Request:** Request `drop table users`. Observe it returns `DENY` or `ESCALATE_TO_HUMAN` based on default security rules.
+4. **Run an Ambiguous Request:** Request `restart the server` without specifying the environment. Observe it returns `NEEDS_CLARIFICATION` asking if this is production or staging.
+5. **Review Audit Trail:** Check the UI dashboard's event ledger to see the immutable log of these decisions and their reasoning.
+
+---
+
+## 🚀 Quickstart & Setup
 
 ### Prerequisites
 - Node.js 18+
-- npm or yarn
+- npm, pnpm, or yarn
 
-### Setup Instructions
-1. Clone the repository:
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/obadadallo95/axon-decision-engine.git
+cd axon-decision-engine
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env.local
+```
+
+### Environment Variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GEMINI_API_KEY` | Yes | Authenticates with Google AI Studio to power the core decision LLM. |
+| `AXON_API_KEY` | No | Optional static Bearer token. Secures the `/api/decide` route for external SDK/Agent integration. |
+
+### Launch the Engine
+```bash
+npm run dev
+```
+The AXON UI dashboard and the `/api/decide` kernel are now live at `http://localhost:3000`.
+
+---
+
+## 💻 Developer Integrations
+
+AXON is built to be integrated directly into your existing AI workflows. We provide a native SDK, raw API access, and drop-in integration skills for leading AI IDEs and agents.
+
+### 1. API Usage
+If your agent or pipeline can run `curl`, it can use AXON.
+
+```bash
+curl -X POST http://localhost:3000/api/decide \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer axn_live_a1b2c3d4e5f6g7h8" \
+  -d '{
+    "prompt": "Install the package lodash@4.17.20 via npm",
+    "policies": [] 
+  }'
+```
+
+**Example JSON Response:**
+```json
+{
+  "decision": "DENY",
+  "riskScore": 85,
+  "reasonEn": "lodash@4.17.20 has known prototype pollution vulnerabilities. Policy forbids installing vulnerable packages.",
+  "reasonAr": "تحتوي حزمة lodash@4.17.20 على ثغرات أمنية معروفة. تمنع السياسة تثبيت الحزم المعرضة للخطر.",
+  "mitigationEn": "Upgrade to lodash@4.17.21 or higher.",
+  "mitigationAr": "الترقية إلى الإصدار 4.17.21 أو أحدث.",
+  "groundingEn": "Found CVE-2021-23337 associated with this version.",
+  "groundingAr": "تم العثور على CVE-2021-23337 مرتبط بهذا الإصدار.",
+  "citations": ["https://nvd.nist.gov/vuln/detail/CVE-2021-23337"]
+}
+```
+
+### 2. TypeScript SDK
+Import the drop-in TypeScript SDK directly into your node applications.
+
+```typescript
+import { axon } from './lib/axon-sdk';
+
+const result = await axon.evaluateAction({
+  prompt: "Drop the users table from the staging database"
+});
+
+if (result.decision === 'ALLOW') {
+  // Execute database drop
+} else {
+  console.warn(`Action blocked: ${result.reasonEn}`);
+  // Handle DENY, ESCALATE, or CLARIFY
+}
+```
+
+### 3. Agent Integration Skills
+We provide pre-configured rules to instantly inject AXON policy awareness into popular developer tools.
+
+#### Cursor IDE
+Forces Cursor's Composer to consult AXON before applying codebase refactors.
+1. Create a `.cursor/rules` directory in your target project.
+2. Copy the AXON rule:
    ```bash
-   git clone <repository-url>
-   cd axon-decision-engine
+   cp .cursor/rules/axon-decision.mdc /path/to/your/project/.cursor/rules/
    ```
 
-2. Install dependencies:
+#### Claude Code
+Binds AXON to Claude Code's terminal execution layer.
+1. Ensure your target project is initialized with Claude Code.
+2. Copy the AXON skill:
    ```bash
-   npm install
+   mkdir -p /path/to/your/project/.claude/skills/axon-decision
+   cp .claude/skills/axon-decision/SKILL.md /path/to/your/project/.claude/skills/axon-decision/
    ```
 
-3. Configure environment variables. Create a `.env` or `.env.local` file:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-
-4. Run the development server:
+#### Antigravity
+Enforces policy-compliant execution for Antigravity autonomous agents.
+1. Ensure your target project uses Antigravity.
+2. Copy the AXON skill:
    ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) to view the workspace.
-
-5. Compile production build:
-   ```bash
-   npm run build
+   mkdir -p /path/to/your/project/.agents/skills/axon-decision-engine
+   cp .agents/skills/axon-decision-engine/SKILL.md /path/to/your/project/.agents/skills/axon-decision-engine/
    ```
 
 ---
 
-## Technical Features
+## 📂 Project Structure Overview
 
-- **Google Search Grounding**: Every prompt is verified via a live Google Search query to check for package CVEs, version reliability, or technical issues, returning direct web citations in the UI.
-- **RTL Language Mirroring**: Generates proper layout orientation shifts when swapping languages, respecting semantic margins, alignment, and typographic density.
-- **Robust Fail-Safe State**: If no Firebase credentials are provided or connection fails, AXON falls back immediately to a fully functional sandboxed LocalStorage layer.
-
-## Security & Compliance Disclosure
-AXON is an advisory decision-support system. While it helps organizations evaluate operational safety risks, its recommendations do not constitute formal legal or regulatory advice. High-risk decisions should be backed by a certified Human-in-the-Loop clearance.
+- `app/api/decide/route.ts`: The core AI engine, executing Gemini and applying structured logic.
+- `app/page.tsx`: The localized (EN/AR), real-time visualization and simulation dashboard.
+- `lib/axon-sdk.ts`: The minimal TypeScript SDK for external consumption.
+- `lib/firestore-service.ts`: The persistence layer with offline failover capability.
+- `.cursor/rules/`: Cursor IDE integration assets.
+- `.claude/skills/`: Claude Code integration assets.
+- `.agents/skills/`: Antigravity integration assets.
 
 ---
 
-## Project Maintainer
+## 📚 Documentation
 
-Developed by **Obada Dallo** (عبادة دللو)
+For deep-dive technical details, explore the documentation:
+- [System Architecture](docs/architecture.md)
+- [SDK & API Reference](docs/sdk-reference.md)
+- [Complete Setup Guide](docs/setup.md)
+- [Detailed File Structure](docs/file-structure.md)
+- [Product Roadmap](docs/roadmap.md)
 
-- 💼 **LinkedIn**: [linkedin.com/in/obada-dallo-777a47a9](https://www.linkedin.com/in/obada-dallo-777a47a9/)
-- 💻 **GitHub**: [github.com/obadadallo95](https://github.com/obadadallo95)
-- 🌐 **Portfolio**: [obadadallo.web.app](https://obadadallo.web.app/)
+---
+
+## License & Compliance
+AXON is an advisory decision-support system. While it evaluates operational safety risks, its recommendations do not constitute formal legal or regulatory advice. Always maintain Human-in-the-Loop clearance for tier-0 production modifications. 
+
+Developed by **Obada Dallo**.
