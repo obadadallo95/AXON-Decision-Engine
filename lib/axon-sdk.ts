@@ -21,6 +21,8 @@ export interface DecisionRequest {
    * The natural language prompt or system command that the AI intends to execute.
    */
   prompt: string;
+  /** Optional stable key used to replay the same server-owned audit result. */
+  idempotencyKey?: string;
   /**
    * Optional context for the action (e.g. environment, user role).
    */
@@ -33,6 +35,19 @@ export interface DecisionRequest {
 
 export interface DecisionResult {
   decision: 'ALLOW' | 'DENY' | 'NEEDS_CLARIFICATION' | 'ESCALATE_TO_HUMAN';
+  state?: 'EXECUTE' | 'ASK' | 'DEFER' | 'ESCALATE' | 'REFUSE';
+  authoritativeDecision?: Record<string, unknown>;
+  auditEventId?: string | null;
+  idempotencyKey?: string;
+  replayed?: boolean;
+  integrity?: {
+    inputHash: string;
+    signalsHash: string;
+    policyHash: string;
+    outcomeHash: string;
+    advisoryHash: string;
+    eventHash: string | null;
+  };
   riskScore: number;
   reasonEn: string;
   reasonAr: string;
@@ -91,6 +106,7 @@ export class AxonDecisionEngine {
         headers,
         body: JSON.stringify({
           prompt: request.prompt,
+          idempotencyKey: request.idempotencyKey,
           policies: policiesToApply,
           context: request.context
         })

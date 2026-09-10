@@ -15,11 +15,11 @@ const faqsEn = [
   },
   {
     q: "How are decisions calculated?",
-    a: "Decisions are made by feeding the natural language request, the current context, and the active organizational policies into a Gemini 1.5-flash model. The model is constrained to return a strict JSON payload with a deterministic state (ALLOW, DENY, NEEDS_CLARIFICATION, ESCALATE_TO_HUMAN)."
+    a: "Requests, typed context, supplied evidence, and active policies are normalized on the server. Gemini may provide a bounded interpretation, but the deterministic kernel selects EXECUTE, ASK, DEFER, ESCALATE, or REFUSE."
   },
   {
-    q: "When is Search Grounding used?",
-    a: "Search grounding (Google Search tools) is activated dynamically by the model when it encounters specific entities—such as an npm package version or a CLI tool—that require real-time verification for known vulnerabilities (CVEs) or deprecation notices."
+    q: "What does Gemini control?",
+    a: "Gemini is an advisory interpreter only. It cannot select the final state, authorize execution, mutate policy, or create audit records. The server-owned deterministic workflow reconciles its output with explicit signals and policies."
   },
   {
     q: "Does AXON provide legal or compliance guarantees?",
@@ -39,7 +39,7 @@ const faqsEn = [
   },
   {
     q: "How is the Audit History stored?",
-    a: "Audit logs are persisted immutably to Firebase Firestore. If the database is offline or unreachable, AXON fails over to a local browser storage cache until the connection is restored."
+    a: "Stage 3 writes decisions and reviews to a server-owned append-only process-local repository. The browser reads history through /api/audit and has no localStorage fallback for authoritative decisions. A durable transactional adapter is required for multi-instance production deployment."
   }
 ];
 
@@ -54,11 +54,11 @@ const faqsAr = [
   },
   {
     q: "كيف يتم حساب القرارات؟",
-    a: "يتم اتخاذ القرارات من خلال تمرير الطلب، والسياق الحالي، والسياسات النشطة إلى نموذج Gemini 1.5-flash ليرجع حالة حتمية (سماح، رفض، بحاجة لتوضيح، تصعيد لبشري)."
+    a: "يتم تطبيع الطلب والسياق والأدلة والسياسات على الخادم. قد يقدم Gemini تفسيراً محدوداً، لكن نواة القرار الحتمية تختار EXECUTE أو ASK أو DEFER أو ESCALATE أو REFUSE."
   },
   {
-    q: "متى يتم استخدام البحث الميداني (Search Grounding)؟",
-    a: "يتم تنشيطه ديناميكياً بواسطة النموذج للتحقق في الوقت الفعلي من الثغرات الأمنية (CVEs) للحزم أو الأدوات."
+    q: "ما الذي يتحكم به Gemini؟",
+    a: "Gemini مستشار للتفسير فقط؛ ولا يستطيع اختيار الحالة النهائية أو تفويض التنفيذ أو تعديل السياسات أو إنشاء سجلات التدقيق."
   },
   {
     q: "هل يوفر أكسون ضمانات قانونية أو امتثال؟",
@@ -78,7 +78,7 @@ const faqsAr = [
   },
   {
     q: "كيف يتم تخزين سجل التدقيق؟",
-    a: "يتم حفظ السجلات بشكل ثابت في Firebase Firestore، مع إمكانية التخزين المؤقت المحلي في حال انقطاع الاتصال."
+    a: "في المرحلة الثالثة، يحفظ الخادم القرارات والمراجعات في مستودع ملحق محلي داخل العملية. يقرأ المتصفح السجل عبر /api/audit ولا يستخدم localStorage كبديل للقرارات الموثوقة."
   }
 ];
 

@@ -1,12 +1,7 @@
 import { 
   collection, 
   getDocs, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  query, 
-  orderBy, 
-  serverTimestamp,
+  doc,
   setDoc
 } from 'firebase/firestore';
 import { db, isFirebaseAvailable } from './firebase';
@@ -35,6 +30,8 @@ export interface AuditLog {
 
 export interface EscalatedItem {
   id: string;
+  requestId?: string;
+  decisionEventId?: string;
   prompt: string;
   category: string;
   timestamp: any;
@@ -96,151 +93,129 @@ function setLocal<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-export async function fetchAuditHistory(): Promise<AuditLog[]> {
-  if (!isFirebaseAvailable) {
-    return getLocal<AuditLog[]>('axon_audit_logs', []);
-  }
-  try {
-    const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate() || new Date(),
-    })) as AuditLog[];
-  } catch (error) {
-    console.error("Firebase fetchAuditHistory error, falling back to localStorage", error);
-    return getLocal<AuditLog[]>('axon_audit_logs', []);
-  }
+interface ServerAuditRecord {
+  eventId: string;
+  requestId: string;
+  timestamp: string;
+  normalizedRequest: {
+    action: { domain: string; operation: string; target: string; parameters: Record<string, unknown> };
+  };
+  authoritativeOutcome: {
+    state: 'EXECUTE' | 'ASK' | 'DEFER' | 'ESCALATE' | 'REFUSE';
+    riskScore: number;
+    matchedRuleCodes: string[];
+  };
 }
 
-export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<string> {
-  const newLog = {
-    ...log,
-    timestamp: new Date()
+interface ServerAuditTrail {
+  decision: ServerAuditRecord;
+  reviews: Array<{ action: 'APPROVE' | 'REJECT'; reason: string; timestamp: string }>;
+}
+
+function legacyDecision(state: ServerAuditRecord['authoritativeOutcome']['state']): AuditLog['decision'] {
+  if (state === 'EXECUTE') return 'ALLOW';
+  if (state === 'REFUSE') return 'DENY';
+  if (state === 'ASK') return 'NEEDS_CLARIFICATION';
+  return 'ESCALATE_TO_HUMAN';
+}
+
+function promptFromRecord(record: ServerAuditRecord): string {
+  const legacyPrompt = record.normalizedRequest.action.parameters.legacyPrompt;
+  return typeof legacyPrompt === 'string'
+    ? legacyPrompt
+    : `${record.normalizedRequest.action.operation} ${record.normalizedRequest.action.target}`;
+}
+
+function auditLogFromRecord(record: ServerAuditRecord): AuditLog {
+  return {
+    id: record.eventId,
+    prompt: promptFromRecord(record),
+    category: record.normalizedRequest.action.domain,
+    timestamp: new Date(record.timestamp),
+    decision: legacyDecision(record.authoritativeOutcome.state),
+    riskScore: record.authoritativeOutcome.riskScore,
+    reasonEn: `Server audit record ${record.eventId} preserves the authoritative ${record.authoritativeOutcome.state} decision.`,
+    reasonAr: `يحفظ سجل الخادم القرار الحتمي ${record.authoritativeOutcome.state}.`,
+    mitigationEn: 'Use the authoritative server decision and audit record before acting.',
+    mitigationAr: 'استخدم قرار الخادم وسجل التدقيق الموثوق قبل التنفيذ.',
+    groundingEn: 'Loaded from the server-owned AXON audit repository.',
+    groundingAr: 'تم تحميله من مستودع تدقيق أكسون المملوك للخادم.',
+    citations: [],
+    matchedPolicyCodes: record.authoritativeOutcome.matchedRuleCodes,
+    requestClassificationEn: record.normalizedRequest.action.domain,
+    requestClassificationAr: 'غير محدد',
+    reviewerOverride: null,
+    reviewedBy: null,
   };
+}
 
-  if (!isFirebaseAvailable) {
-    const logs = getLocal<AuditLog[]>('axon_audit_logs', []);
-    const id = 'log-' + Math.random().toString(36).substr(2, 9);
-    const savedLog = { id, ...newLog };
-    setLocal('axon_audit_logs', [savedLog, ...logs]);
-    return id;
-  }
-
-  try {
-    const docRef = await addDoc(collection(db, 'audit_logs'), {
-      ...newLog,
-      timestamp: serverTimestamp()
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error("Firebase addAuditLog error, falling back to localStorage", error);
-    const logs = getLocal<AuditLog[]>('axon_audit_logs', []);
-    const id = 'log-' + Math.random().toString(36).substr(2, 9);
-    const savedLog = { id, ...newLog };
-    setLocal('axon_audit_logs', [savedLog, ...logs]);
-    return id;
-  }
+export async function fetchAuditHistory(): Promise<AuditLog[]> {
+  const response = await fetch('/api/audit?limit=100', { cache: 'no-store' });
+  if (!response.ok) throw new Error('SERVER_AUDIT_READ_FAILED');
+  const data = (await response.json()) as { records: ServerAuditRecord[] };
+  return data.records.map(auditLogFromRecord);
 }
 
 export async function fetchEscalatedQueue(): Promise<EscalatedItem[]> {
-  if (!isFirebaseAvailable) {
-    return getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-  }
-  try {
-    const q = query(collection(db, 'escalated_queue'), orderBy('timestamp', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate() || new Date(),
-    })) as EscalatedItem[];
-  } catch (error) {
-    console.error("Firebase fetchEscalatedQueue error, falling back to localStorage", error);
-    return getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-  }
+  const response = await fetch('/api/audit?limit=100', { cache: 'no-store' });
+  if (!response.ok) throw new Error('SERVER_AUDIT_READ_FAILED');
+  const data = (await response.json()) as {
+    audits?: ServerAuditTrail[];
+    records: ServerAuditRecord[];
+  };
+  const trails = data.audits ?? data.records.map((record) => ({ decision: record, reviews: [] }));
+  return trails
+    .filter(({ decision }) => decision.authoritativeOutcome.state === 'ESCALATE')
+    .map(({ decision, reviews }) => {
+      const lastReview = reviews[reviews.length - 1];
+      return {
+        id: decision.eventId,
+        requestId: decision.requestId,
+        decisionEventId: decision.eventId,
+        prompt: promptFromRecord(decision),
+        category: decision.normalizedRequest.action.domain,
+        timestamp: new Date(decision.timestamp),
+        riskScore: decision.authoritativeOutcome.riskScore,
+        reasonEn: `Authoritative server decision: ${decision.authoritativeOutcome.state}.`,
+        reasonAr: `قرار الخادم الموثوق: ${decision.authoritativeOutcome.state}.`,
+        status: lastReview?.action === 'APPROVE' ? 'approved' : lastReview?.action === 'REJECT' ? 'rejected' : 'pending',
+        reviewerComment: lastReview?.reason,
+        reviewedAt: lastReview ? new Date(lastReview.timestamp) : undefined,
+      } satisfies EscalatedItem;
+    });
 }
 
-export async function addEscalatedQueue(item: Omit<EscalatedItem, 'id' | 'timestamp'>): Promise<string> {
-  const newItem = {
-    ...item,
-    timestamp: new Date()
-  };
+/** Decision audit creation is server-only in Stage 3. */
+export async function addAuditLog(_log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<string> {
+  throw new Error('SERVER_AUDIT_ONLY');
+}
 
-  if (!isFirebaseAvailable) {
-    const queue = getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-    const id = 'esc-' + Math.random().toString(36).substr(2, 9);
-    const savedItem = { id, ...newItem };
-    setLocal('axon_escalated_queue', [savedItem, ...queue]);
-    return id;
-  }
-
-  try {
-    const docRef = await addDoc(collection(db, 'escalated_queue'), {
-      ...newItem,
-      timestamp: serverTimestamp()
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error("Firebase addEscalatedQueue error, falling back to localStorage", error);
-    const queue = getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-    const id = 'esc-' + Math.random().toString(36).substr(2, 9);
-    const savedItem = { id, ...newItem };
-    setLocal('axon_escalated_queue', [savedItem, ...queue]);
-    return id;
-  }
+/** Escalation records are created by /api/decide, never by the browser. */
+export async function addEscalatedQueue(_item: Omit<EscalatedItem, 'id' | 'timestamp'>): Promise<string> {
+  throw new Error('SERVER_AUDIT_ONLY');
 }
 
 export async function updateEscalatedDecision(
   id: string, 
   status: 'approved' | 'rejected' | 'resolved', 
-  comment: string
+  comment: string,
+  requestId = id,
 ): Promise<void> {
-  if (!isFirebaseAvailable) {
-    const queue = getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-    const updated = queue.map(item => {
-      if (item.id === id) {
-        return { ...item, status, reviewerComment: comment, reviewedAt: new Date() };
-      }
-      return item;
-    });
-    setLocal('axon_escalated_queue', updated);
-    
-    // Also update audit log if matched
-    const logs = getLocal<AuditLog[]>('axon_audit_logs', []);
-    const updatedLogs = logs.map(log => {
-      if (log.prompt === queue.find(q => q.id === id)?.prompt) {
-        return { 
-          ...log, 
-          reviewerOverride: status === 'approved' ? 'ALLOW' : 'DENY',
-          reviewedBy: 'Governance Reviewer',
-          reviewedAt: new Date()
-        };
-      }
-      return log;
-    });
-    setLocal('axon_audit_logs', updatedLogs);
-    return;
-  }
-
-  try {
-    const docRef = doc(db, 'escalated_queue', id);
-    await updateDoc(docRef, {
-      status,
-      reviewerComment: comment,
-      reviewedAt: serverTimestamp()
-    });
-  } catch (error) {
-    console.error("Firebase updateEscalatedDecision error, falling back to localStorage", error);
-    const queue = getLocal<EscalatedItem[]>('axon_escalated_queue', []);
-    const updated = queue.map(item => {
-      if (item.id === id) {
-        return { ...item, status, reviewerComment: comment, reviewedAt: new Date() };
-      }
-      return item;
-    });
-    setLocal('axon_escalated_queue', updated);
+  if (status === 'resolved') throw new Error('REVIEW_ACTION_UNSUPPORTED');
+  const response = await fetch('/api/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId,
+      decisionEventId: id,
+      action: status === 'approved' ? 'APPROVE' : 'REJECT',
+      reviewer: { id: 'dashboard-reviewer', role: 'reviewer' },
+      reason: comment,
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(typeof data.error === 'string' ? data.error : 'SERVER_REVIEW_FAILED');
   }
 }
 

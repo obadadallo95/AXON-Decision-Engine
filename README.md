@@ -19,7 +19,7 @@
 
 **AXON** is an operational decision safety engine. It acts as an external policy verification layer for autonomous AI agents (such as Cursor, Claude Code, and Antigravity) and automated infrastructure pipelines.
 
-Rather than offering conversational interfaces, AXON serves a single purpose: **deterministic action verification**. It evaluates requested actions against live organizational policies using Google's Gemini models and web grounding, and deterministically decides if the system should proceed.
+Rather than offering conversational interfaces, AXON serves a single purpose: **deterministic action verification**. Gemini can interpret bounded action language and supplied evidence, but the server-owned deterministic kernel decides if the system should proceed.
 
 ### Why AXON Matters
 Modern AI agents have powerful capabilities to write code, install dependencies, and run terminal commands. However, they lack institutional awareness. They do not naturally know if a specific package is forbidden by your company's security policy, or if modifying a database schema requires senior engineering review. 
@@ -30,16 +30,20 @@ By offloading authorization logic to AXON, your agents remain decoupled from cor
 
 - **Multi-Format Policy Ingestion Pipeline:** Non-technical managers and security teams can directly upload their company's official security handbooks or structured exports (`.json`, `.pdf`, `.txt`, `.md`, `.html`). AXON will automatically extract, structure, and stage the security rules for human review before enforcing them, using Gemini's native document comprehension capabilities.
 - **Agent Integration (SDK):** Seamless integration with AI workflows via minimal SDKs and pre-built skills for Antigravity, Cursor, and Claude Code.
-- **Google Search Grounding:** Verifies facts and technical CVEs in real-time before issuing a decision.
+- **Bounded Gemini Interpretation:** Structures natural-language intent and evidence without granting the model decision or policy authority.
+- **Server-Owned Audit Trail:** Persists the normalized request, signals, policy hash, outcome hash, and append-only review events before returning a decision.
 - **Bilingual Reasoning:** Generates objective analyses and reasoning in both English and native Arabic.
 
 ## The Decision Output
 
-Every request sent to AXON yields one of four strict states, along with technical reasoning and mitigation strategies:
-- `ALLOW`: Action complies with policy. Proceed.
-- `DENY`: Action severely violates policy. Execution halted.
-- `NEEDS_CLARIFICATION`: Policy is ambiguous regarding the request. Requires user context.
-- `ESCALATE_TO_HUMAN`: High-risk action detected. Agent must defer to human execution.
+Every request sent to AXON yields one of five canonical states, along with technical reasoning, integrity metadata, and mitigation strategies:
+- `EXECUTE`: Deterministic policy evaluation permits the action.
+- `ASK`: Requester-owned information is missing.
+- `DEFER`: Evidence or timing is stale, conflicting, or unavailable.
+- `ESCALATE`: A legitimate human review boundary is required.
+- `REFUSE`: A hard policy prohibits the action.
+
+Legacy clients still receive `ALLOW`, `DENY`, `NEEDS_CLARIFICATION`, and `ESCALATE_TO_HUMAN` projections.
 
 ---
 
@@ -47,10 +51,10 @@ Every request sent to AXON yields one of four strict states, along with technica
 
 To quickly evaluate the core Decision Engine, follow these steps:
 1. **Open the Workspace:** Launch the local server and navigate to `http://localhost:3000`.
-2. **Run a Safe Request:** Use the Live Simulator or API to request `npm install react`. Verify it returns `ALLOW`.
-3. **Run a Risky Request:** Request `drop table users`. Observe it returns `DENY` or `ESCALATE_TO_HUMAN` based on default security rules.
-4. **Run an Ambiguous Request:** Request `restart the server` without specifying the environment. Observe it returns `NEEDS_CLARIFICATION` asking if this is production or staging.
-5. **Review Audit Trail:** Check the UI dashboard's event ledger to see the immutable log of these decisions and their reasoning.
+2. **Run a Safe Structured Request:** Use the API with complete typed context and verify the canonical state is `EXECUTE` (legacy `ALLOW`).
+3. **Run a Risky Request:** Supply a hard `REFUSE` policy for a destructive action and verify the canonical state is `REFUSE` (legacy `DENY`).
+4. **Run an Ambiguous Request:** Send the legacy `restart the server` payload without specifying the environment. Observe the safe `ASK` state (legacy `NEEDS_CLARIFICATION`).
+5. **Review Audit Trail:** Check the UI dashboard's event ledger, which reads server-owned audit records and review history.
 
 ---
 
@@ -78,7 +82,7 @@ cp .env.example .env.local
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `GEMINI_API_KEY` | Yes | Authenticates with Google AI Studio to power the core decision LLM. |
+| `GEMINI_API_KEY` | No | Enables bounded Gemini interpretation; deterministic decisions remain available without it. |
 | `AXON_API_KEY` | No | Optional static Bearer token. Secures the `/api/decide` route for external SDK/Agent integration. |
 
 ### Launch the Engine
@@ -101,23 +105,41 @@ curl -X POST http://localhost:3000/api/decide \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer axn_live_a1b2c3d4e5f6g7h8" \
   -d '{
-    "prompt": "Install the package lodash@4.17.20 via npm",
-    "policies": [] 
+    "requestId": "req-docs-001",
+    "idempotencyKey": "docs-example-001",
+    "action": {
+      "domain": "dependency",
+      "operation": "install",
+      "target": "lodash@4.17.20",
+      "parameters": { "destructive": false }
+    },
+    "context": {
+      "environment": "development",
+      "actor": { "id": "docs-client", "role": "operator" },
+      "approvals": [],
+      "requiredApprovals": [],
+      "requiredFacts": [],
+      "reversibility": "reversible",
+      "blastRadius": "low",
+      "costOfWrong": "medium",
+      "requestedAt": "2026-09-10T10:00:00.000Z",
+      "additionalFacts": {},
+      "evidence": { "stale": false, "conflicting": false }
+    },
+    "policies": []
   }'
 ```
 
 **Example JSON Response:**
 ```json
 {
-  "decision": "DENY",
-  "riskScore": 85,
-  "reasonEn": "lodash@4.17.20 has known prototype pollution vulnerabilities. Policy forbids installing vulnerable packages.",
-  "reasonAr": "تحتوي حزمة lodash@4.17.20 على ثغرات أمنية معروفة. تمنع السياسة تثبيت الحزم المعرضة للخطر.",
-  "mitigationEn": "Upgrade to lodash@4.17.21 or higher.",
-  "mitigationAr": "الترقية إلى الإصدار 4.17.21 أو أحدث.",
-  "groundingEn": "Found CVE-2021-23337 associated with this version.",
-  "groundingAr": "تم العثور على CVE-2021-23337 مرتبط بهذا الإصدار.",
-  "citations": ["https://nvd.nist.gov/vuln/detail/CVE-2021-23337"]
+  "decision": "ALLOW",
+  "state": "EXECUTE",
+  "authoritativeDecision": { "state": "EXECUTE", "authoritative": "deterministic" },
+  "auditEventId": "decision_...",
+  "idempotencyKey": "docs-example-001",
+  "replayed": false,
+  "integrity": { "inputHash": "...", "signalsHash": "...", "policyHash": "...", "outcomeHash": "...", "advisoryHash": "...", "eventHash": "..." }
 }
 ```
 
@@ -172,10 +194,15 @@ Enforces policy-compliant execution for Antigravity autonomous agents.
 
 ## 📂 Project Structure Overview
 
-- `app/api/decide/route.ts`: The core AI engine, executing Gemini and applying structured logic.
+- `app/api/decide/route.ts`: Thin decision API preserving legacy fields while calling the server decision service.
+- `app/api/audit/route.ts`: Server-owned audit read endpoint.
+- `app/api/review/route.ts`: Strict append-only review endpoint for ESCALATE decisions.
+- `server/decision-service.ts`: Validation, idempotency, bounded advisory orchestration, deterministic evaluation, and audit persistence.
+- `server/audit-repository.ts`: Process-local server-owned demo repository with atomic idempotency/review behavior.
+- `server/hash.ts`: Stable canonical JSON and SHA-256 artifact hashing.
 - `app/page.tsx`: The localized (EN/AR), real-time visualization and simulation dashboard.
 - `lib/axon-sdk.ts`: The minimal TypeScript SDK for external consumption.
-- `lib/firestore-service.ts`: The persistence layer with offline failover capability.
+- `lib/firestore-service.ts`: Browser read adapter for server audit data and existing policy display storage; it cannot create authoritative decision records.
 - `.cursor/rules/`: Cursor IDE integration assets.
 - `.claude/skills/`: Claude Code integration assets.
 - `.agents/skills/`: Antigravity integration assets.
@@ -194,6 +221,14 @@ For deep-dive technical details, explore the documentation:
 ---
 
 ## License & Compliance
-AXON is an advisory decision-support system. While it evaluates operational safety risks, its recommendations do not constitute formal legal or regulatory advice. Always maintain Human-in-the-Loop clearance for tier-0 production modifications. 
+AXON is an advisory decision-support system. While it evaluates operational safety risks, its recommendations do not constitute formal legal or regulatory advice. Always maintain Human-in-the-Loop clearance for tier-0 production modifications.
+
+### Audit and review behavior
+
+Structured requests may include an `idempotencyKey`. Reusing it with the same normalized request and policy set returns the original audit identity; reusing it with different input or policies returns `IDEMPOTENCY_CONFLICT`. Legacy requests without a key receive a request-scoped compatibility key and are not replay-deduplicated across calls.
+
+The `/api/decide` workflow writes the server-owned audit record before returning. A failed audit write prevents normal `EXECUTE` authorization and returns `AUDIT_WRITE_FAILED`; a `REFUSE` remains `REFUSE` while exposing the failure. `/api/review` appends an `APPROVE` or `REJECT` event only to an `ESCALATE` decision. It never mutates the original decision, and hard `REFUSE` cannot be approved.
+
+The current repository is demo-grade process-local memory. It is server-owned and has no browser localStorage fallback for decisions, but it is not durable across restarts or horizontally scaled instances. A transactional server-side Firestore adapter is a later deployment concern.
 
 Developed by **Obada Dallo**.

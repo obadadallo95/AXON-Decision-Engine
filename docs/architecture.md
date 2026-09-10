@@ -7,32 +7,45 @@ AXON serves as an external, objective verification layer, decoupling security go
 ```mermaid
 graph TD
     A[AI Agents / Developer IDEs] -->|HTTP POST Request| B(AXON Decision API: /api/decide)
-    B -->|Fetch Active Policies| C[(Policy Datastore)]
-    B -->|Context + Prompt + Policies| D[Google Gemini 1.5 Flash]
-    D -.->|Search Grounding| E[Google Web Search]
-    D -->|Structured Output JSON| B
-    B -->|Decision Payload| A
-    C -.->|Syncs With| F[AXON Web UI Dashboard]
+    B -->|Normalize + hash + idempotency| C[Decision Service]
+    C -->|Bounded interpretation only| D[Google Gemini]
+    C -->|Deterministic reconciliation + policy evaluation| E[Decision Kernel]
+    C -->|Append decision record| F[(Server Audit Repository)]
+    G[Human Reviewer] -->|POST /api/review| H[Review API]
+    H -->|Append review event| F
+    I[AXON Web UI] -->|GET /api/audit| J[Audit API]
+    J --> F
+    C -->|Decision + audit identity| A
 ```
 
-## 2. The Core Kernel (`app/api/decide/route.ts`)
+The current repository uses a process-local server-owned repository. It is suitable for local and single-instance demonstrations, but it is not durable across restarts or safe as a shared store across multiple instances.
 
-The decision kernel is an ultra-fast Next.js Serverless Route. It is the only component that interfaces with the external LLM.
+## 2. The Core Workflow (`server/decision-service.ts`)
 
-- **Authentication**: Checks for `Bearer` tokens matching `AXON_API_KEY`. Provides seamless bypasses for the local web UI.
-- **LLM Engine**: Uses `@google/genai` to invoke `gemini-1.5-flash`.
-- **Search Grounding**: The engine is configured with Google Search Grounding to verify packages, CVEs, and real-time world knowledge (e.g. "Is npm package 'X' currently compromised?").
-- **Schema Enforcement**: Utilizing `Type.OBJECT`, the route forces the LLM to reply with a strictly parsed JSON payload matching the `DecisionResult` interface.
+The Next.js route is intentionally thin. `server/decision-service.ts` owns the request lifecycle and writes the audit record before returning the decision.
 
-## 3. Data Persistence (`lib/firestore-service.ts`)
+- **Normalization and idempotency**: Requests and policy rules are normalized and hashed. A structured request may supply an idempotency key; legacy requests receive a request-scoped compatibility key.
+- **Bounded interpretation**: Gemini receives the request, explicit signals, evidence, and policy summaries. Its output is advisory and cannot select the final state.
+- **Deterministic authority**: Explicit signals are reconciled with advisory interpretation, then the policy kernel selects `EXECUTE`, `ASK`, `DEFER`, `ESCALATE`, or `REFUSE`.
+- **Audit-before-return**: The service appends a decision record containing normalized input, signals, policy authority, outcome, model metadata, and integrity hashes before returning a normal result.
+- **Failure safety**: If the audit write fails, normal `EXECUTE` is withheld and the response exposes `AUDIT_WRITE_FAILED`.
 
-AXON implements a dual-layer, fail-safe storage architecture for compliance policies and audit logs:
-1. **Primary**: Google Cloud Firestore.
-2. **Fallback**: If Firestore is unreachable or unconfigured, the data layer automatically degrades gracefully into `localStorage`, ensuring the application remains functional for local testing and simulation without requiring complex cloud setups.
+## 3. Server-Owned Audit and Review (`server/audit-repository.ts`)
 
-## 4. The UI Dashboard (`app/page.tsx`)
+`server/audit-repository.ts` exposes append-only decision and review operations. It enforces idempotency conflicts, first-review-wins behavior, review eligibility, and hash linkage from each review event to its parent decision event. There are no authoritative browser writes and no localStorage fallback for decisions.
+
+`lib/firestore-service.ts` remains a browser adapter for policy display/storage and for reading server audit data through `/api/audit`. A durable server-side Firestore/Admin adapter is intentionally deferred; it must provide transactions or equivalent atomic compare-and-set semantics before being used for multi-instance deployment.
+
+## 4. API Boundaries
+
+- **`POST /api/decide`**: Validates structured or legacy input and returns the deterministic outcome plus `auditEventId`, `idempotencyKey`, replay status, and integrity metadata.
+- **`POST /api/review`**: Accepts only `APPROVE` or `REJECT` for an existing `ESCALATE` decision. It appends an immutable review event and never changes the original decision record.
+- **`GET /api/audit`**: Reads a decision audit trail by `requestId` or lists recent server-owned records for the dashboard.
+
+## 5. The UI Dashboard (`app/page.tsx`)
 
 A React/Next.js interface designed to give human operators visibility into the system.
 - **Policy Management**: Operators can write, toggle, and delete security guardrails.
 - **Live Simulator**: A terminal-like interface to directly hit the API endpoint and visualize how the decision engine interprets different payloads.
+- **Audit visibility**: The dashboard reads audit and review history from the server API; it does not create or mutate authoritative decision records in the browser.
 - **Bilingual Interface**: Absolute RTL-compliant rendering utilizing advanced Tailwind CSS configurations to support both English and Arabic natively.

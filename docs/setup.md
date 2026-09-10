@@ -7,8 +7,8 @@ This guide covers how to run the AXON Decision Engine locally, test it with AI a
 ### Prerequisites
 - **Node.js**: `v18.17.0` or higher.
 - **Package Manager**: `npm`, `yarn`, or `pnpm`.
-- **Google Gemini API Key**: Acquired via [Google AI Studio](https://aistudio.google.com/).
-- **(Optional) Firebase Account**: For persistent cloud storage. If not provided, AXON falls back to a functional browser `localStorage` layer.
+- **Google Gemini API Key**: Optional; acquire one via [Google AI Studio](https://aistudio.google.com/) to enable bounded interpretation. Deterministic evaluation remains available without it.
+- **(Optional) Firebase Account**: Used by the browser policy adapter. It is not the authoritative Stage 3 audit store.
 
 ### Installation
 1. **Clone the repository:**
@@ -25,11 +25,11 @@ This guide covers how to run the AXON Decision Engine locally, test it with AI a
 3. **Configure Environment Variables:**
    Create `.env.local` at the root of your project:
    ```env
-   # [REQUIRED] The Gemini Engine credentials
+   # [OPTIONAL] Enables bounded Gemini interpretation
    GEMINI_API_KEY=your_gemini_api_key
 
-   # [OPTIONAL] API Key required when hitting /api/decide externally.
-   # If omitted, external clients can hit the API without Auth (Useful for local testing).
+   # [OPTIONAL] Bearer token required when hitting the API externally.
+   # If omitted, the local API accepts requests without authentication.
    AXON_API_KEY=your_secure_random_key
    ```
 
@@ -61,20 +61,36 @@ curl -X POST http://localhost:3000/api/decide \
   }'
 ```
 
-You should receive a structured JSON response containing:
+You should receive a structured JSON response containing the legacy projection and server-owned audit metadata:
 ```json
 {
   "decision": "ESCALATE_TO_HUMAN",
-  "reasonEn": "The policy 'DB Protection' strictly mandates human review for database schema modifications.",
+  "authoritativeDecision": "ESCALATE",
+  "auditEventId": "decision_...",
+  "idempotencyKey": "request_...",
+  "integrity": {
+    "inputHash": "...",
+    "signalsHash": "...",
+    "policyHash": "...",
+    "outcomeHash": "...",
+    "advisoryHash": "...",
+    "eventHash": "..."
+  },
   ...
 }
 ```
+
+Repeat structured requests with the same `idempotencyKey` to replay the original decision and audit identity. Reusing that key with different normalized input or policies returns `IDEMPOTENCY_CONFLICT`. Requests using the legacy payload without a key receive a request-scoped compatibility key.
+
+Audit records are written on the server before a normal decision is returned. If that write is unavailable, AXON withholds `EXECUTE` and returns `AUDIT_WRITE_FAILED`. Only `ESCALATE` decisions can receive an append-only `APPROVE` or `REJECT` event through `POST /api/review`; the original decision is never mutated.
 
 ---
 
 ## 3. Production Deployment
 
 AXON is built on Next.js App Router and deploys seamlessly to Vercel, or any Node-compatible hosting provider (Render, Railway, AWS Amplify).
+
+The included audit repository is process-local demo storage. It is not durable across restarts and does not coordinate multiple server instances. Use a server-side transactional adapter before deploying the audit workflow behind a load balancer. Do not treat browser Firestore or localStorage as authoritative decision storage.
 
 ### Deploying to Vercel
 1. Push your repository to GitHub.

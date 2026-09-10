@@ -52,7 +52,7 @@ export default function AboutPage() {
       <h3 className="text-lg font-bold text-[var(--text-main)] mt-8 mb-3">{language === 'en' ? 'Architecture' : 'البنية'}</h3>
       <p className="text-[var(--text-dim)] leading-relaxed">
         {language === 'en'
-          ? "By offloading the authorization logic to the AXON API, your agents remain decoupled from corporate governance rules. The Decision Engine processes policies, executes search-grounding via Gemini to check external threats, and returns a decisive JSON payload through the SDK."
+          ? "By offloading the authorization logic to the AXON API, your agents remain decoupled from corporate governance rules. The Decision Engine processes supplied policies and evidence, may use Gemini for bounded interpretation, and returns a decisive JSON payload through the SDK."
           : "من خلال نقل منطق التفويض إلى واجهة أكسون، يبقى وكلائك مستقلين عن قواعد الحوكمة. يقوم المحرك بمعالجة السياسات، والتحقق عبر نماذج Gemini، وإرجاع قرار حاسم عبر SDK."}
       </p>
     </div>

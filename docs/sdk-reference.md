@@ -13,6 +13,7 @@ AXON provides both a REST API and a native TypeScript SDK, allowing you to wrap 
 ```typescript
 interface DecisionRequest {
   prompt: string;                      // The action to execute (e.g. "npm install lodash")
+  idempotencyKey?: string;             // Replays the same audit identity for the same normalized input
   context?: Record<string, any>;       // Optional: Contextual metadata (environment, user, etc.)
   policies?: SecurityPolicy[];         // Optional: Dynamic policies. If omitted, uses global policies.
 }
@@ -22,16 +23,31 @@ interface DecisionRequest {
 ```typescript
 interface DecisionResult {
   decision: 'ALLOW' | 'DENY' | 'NEEDS_CLARIFICATION' | 'ESCALATE_TO_HUMAN';
+  state: 'EXECUTE' | 'ASK' | 'DEFER' | 'ESCALATE' | 'REFUSE';
+  authoritativeDecision: { state: DecisionResult['state']; /* plus deterministic outcome fields */ };
+  auditEventId: string | null;
+  idempotencyKey: string;
+  replayed: boolean;
+  integrity: {
+    inputHash: string;
+    signalsHash: string;
+    policyHash: string;
+    outcomeHash: string;
+    advisoryHash: string;
+    eventHash: string | null;
+  };
   riskScore: number;           // 0-100 score indicating calculated risk severity
   reasonEn: string;            // English explanation of the ruling
   reasonAr: string;            // Arabic explanation of the ruling
   mitigationEn: string;        // Suggested next steps in English
   mitigationAr: string;        // Suggested next steps in Arabic
-  groundingEn: string;         // Evidence found via Search Grounding
-  groundingAr: string;         // Evidence found via Search Grounding (Arabic)
-  citations: string[];         // Web URLs supporting the decision
+  groundingEn: string;         // Advisory/evidence status; not an authority signal
+  groundingAr: string;         // Advisory/evidence status in Arabic
+  citations: string[];         // Legacy field; current bounded provider does not add web citations
 }
 ```
+
+The legacy payload is compatibility-oriented. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the response's `authoritativeDecision` and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
 
 ---
 

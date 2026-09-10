@@ -58,6 +58,9 @@ describe("/api/decide deterministic boundary", () => {
     expect(result.execute).toBe(false);
     expect(result.outcome.authoritative).toBe("deterministic");
     expect(result.groundingEn).toContain("Gemini is not authoritative");
+    expect(result.authoritativeDecision.state).toBe("REFUSE");
+    expect(result.auditEventId).toMatch(/^decision_/);
+    expect(result.integrity.inputHash).toHaveLength(64);
   });
 
   it("keeps legacy prompt requests safe when structured context is absent", async () => {
@@ -74,5 +77,50 @@ describe("/api/decide deterministic boundary", () => {
     expect(result.state).toBe("ASK");
     expect(result.decision).toBe("NEEDS_CLARIFICATION");
     expect(result.execute).toBe(false);
+    expect(result.auditEventId).toMatch(/^decision_/);
+    expect(result.idempotencyKey).toMatch(/^legacy-/);
+  });
+
+  it("replays the same server audit identity for a structured idempotency key", async () => {
+    const body = {
+      requestId: "req-route-idempotency-001",
+      idempotencyKey: "route-idempotency-001",
+      action: {
+        domain: "deployment",
+        operation: "publish-canary",
+        target: "staging/checkout",
+        parameters: {},
+      },
+      context: {
+        ...context,
+        environment: "staging",
+        reversibility: "reversible",
+        blastRadius: "low",
+        costOfWrong: "low",
+      },
+      policies: [],
+    };
+    const firstResponse = await POST(
+      new Request("http://localhost:3000/api/decide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }) as never,
+    );
+    const secondResponse = await POST(
+      new Request("http://localhost:3000/api/decide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }) as never,
+    );
+
+    const first = await firstResponse.json();
+    const second = await secondResponse.json();
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(second.replayed).toBe(true);
+    expect(second.auditEventId).toBe(first.auditEventId);
+    expect(second.integrity).toEqual(first.integrity);
   });
 });

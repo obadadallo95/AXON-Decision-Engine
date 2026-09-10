@@ -90,8 +90,9 @@ service cloud.firestore {
       allow list: if isVerifiedUser();
       allow get: if isVerifiedUser();
       
-      // Logs are immutable (Pillar 4 / Pillar 12)
-      allow create: if isVerifiedUser() && isValidId(logId) && isValidAuditLog(incoming());
+      // Stage 3 audit records are written only by the server-owned decision API.
+      // Browser clients may read history but cannot create authoritative records.
+      allow create: if false;
       
       // No updates or deletions to audit logs are ever allowed (zero-trust immutability)
       allow update, delete: if false;
@@ -101,15 +102,8 @@ service cloud.firestore {
     match /escalated_queue/{itemId} {
       allow list, get: if isVerifiedUser();
       
-      // Operators can create a pending escalation item
-      allow create: if isVerifiedUser() && isValidId(itemId) && isValidEscalatedItem(incoming()) && incoming().status == 'pending';
-      
-      // Reviewers can update pending escalation status with review comments (Pillar 4 / 6)
-      allow update: if isAuthorizedPersonnel() && 
-        isValidId(itemId) && 
-        existing().status == 'pending' &&
-        incoming().status in ['approved', 'rejected', 'resolved'] &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewerComment', 'reviewedAt']);
+      // Escalations and reviews are append-only server API events in Stage 3.
+      allow create, update: if false;
 
       allow delete: if false; // Escalation records cannot be deleted
     }

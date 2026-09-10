@@ -1,27 +1,20 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   DecisionContextInputSchema,
-  deriveDecisionSignals,
-  evaluateDecisionWithSignals,
   normalizeDecisionRequest,
   ProposedActionSchema,
   PolicyRuleSchema,
-  reconcileDecisionSignals,
-  safeEvaluateDecision,
 } from "@/lib/axon-core";
 import type {
-  AdvisoryInterpretation,
   DecisionRequest,
+  DecisionOutcome,
   DecisionState,
   JsonObject,
-  PolicyRule,
 } from "@/lib/axon-core";
-import {
-  advisoryFromProviderFailure,
-  geminiAdvisoryProvider,
-  policySummaries,
-} from "@/server/advisory-provider";
+import { DecisionServiceError, decisionService } from "@/server/decision-service";
+import { sha256 } from "@/server/hash";
 
 const LegacyPolicySchema = z
   .object({
@@ -34,6 +27,8 @@ const LegacyPolicySchema = z
 const StructuredRequestSchema = z
   .object({
     requestId: z.string().min(1).max(128),
+    idempotencyKey: z.string().trim().min(1).max(128).optional(),
+    policyVersion: z.string().trim().min(1).max(128).nullable().optional(),
     action: ProposedActionSchema,
     context: DecisionContextInputSchema,
     policies: z.array(PolicyRuleSchema).max(100).default([]),
@@ -43,6 +38,7 @@ const StructuredRequestSchema = z
 const LegacyRequestSchema = z
   .object({
     requestId: z.string().min(1).max(128).optional(),
+    idempotencyKey: z.string().trim().min(1).max(128).optional(),
     prompt: z.string().trim().min(1).max(10000),
     policies: z.array(LegacyPolicySchema).max(100).default([]),
     context: z.record(z.string(), z.unknown()).default({}),
@@ -91,7 +87,11 @@ function legacyRequest(input: z.infer<typeof LegacyRequestSchema>): unknown {
   const evidence = objectValue(context.evidence);
 
   return {
-    requestId: input.requestId ?? "legacy-request",
+    requestId:
+      input.requestId ??
+      (input.idempotencyKey
+        ? `legacy-${sha256(input.idempotencyKey).slice(0, 24)}`
+        : `legacy-${randomUUID()}`),
     action: {
       domain: stringValue(context.domain, "general"),
       operation: stringValue(context.operation, "legacy.evaluate"),
@@ -148,9 +148,13 @@ function legacyDecision(
 }
 
 function responseFor(
-  outcome: ReturnType<typeof safeEvaluateDecision>,
+  outcome: DecisionOutcome,
   request: DecisionRequest,
-  advisory: AdvisoryInterpretation,
+  advisory: import("@/lib/axon-core").AdvisoryInterpretation,
+  auditEventId: string | null,
+  idempotencyKey: string,
+  integrity: import("@/server/audit-types").AuditIntegrityMetadata,
+  replayed: boolean,
   legacyPolicyCount = 0,
 ) {
   const legacy = legacyDecision(outcome.state);
@@ -160,10 +164,15 @@ function responseFor(
   const executable = outcome.state === "EXECUTE";
 
   return {
+    requestId: request.requestId,
     state: outcome.state,
     outcome,
     authoritativeDecision: outcome,
     advisoryInterpretation: advisory,
+    auditEventId,
+    idempotencyKey,
+    replayed,
+    integrity,
     decision: legacy,
     execute: executable,
     riskScore: outcome.riskScore,
@@ -197,51 +206,8 @@ function responseFor(
   };
 }
 
-async function evaluateWithAdvisory(
-  request: DecisionRequest,
-  rules: PolicyRule[],
-  legacyPolicySummaries: { code: string; description: string }[],
-  allowLegacyInference: boolean,
-): Promise<{
-  outcome: ReturnType<typeof safeEvaluateDecision>;
-  request: DecisionRequest;
-  advisory: AdvisoryInterpretation;
-}> {
-  const explicitSignals = deriveDecisionSignals(request);
-  let advisory: AdvisoryInterpretation;
-  try {
-    advisory = await geminiAdvisoryProvider.interpret({
-      request,
-      explicitSignals,
-      evidence: request.context.evidenceItems ?? [],
-      policySummaries: legacyPolicySummaries,
-    });
-  } catch (error) {
-    advisory = advisoryFromProviderFailure(error);
-  }
-
-  const reconciled = reconcileDecisionSignals(
-    request,
-    advisory,
-    allowLegacyInference,
-  );
-  try {
-    return {
-      outcome: evaluateDecisionWithSignals(
-        reconciled.request,
-        rules,
-        reconciled.signals,
-      ),
-      request: reconciled.request,
-      advisory,
-    };
-  } catch (error) {
-    return {
-      outcome: safeEvaluateDecision(reconciled.request, rules),
-      request: reconciled.request,
-      advisory: advisoryFromProviderFailure(error),
-    };
-  }
+function statusFor(outcome: DecisionOutcome): number {
+  return outcome.failureState === "AUDIT_WRITE_FAILED" ? 503 : 200;
 }
 
 export async function POST(req: NextRequest) {
@@ -265,37 +231,58 @@ export async function POST(req: NextRequest) {
         action: structured.data.action,
         context: structured.data.context,
       });
-      const evaluated = await evaluateWithAdvisory(
+      const evaluated = await decisionService.decide({
         request,
-        structured.data.policies,
-        policySummaries(structured.data.policies),
-        false,
-      );
+        policies: structured.data.policies,
+        idempotencyKey: structured.data.idempotencyKey,
+        policyVersion: structured.data.policyVersion,
+      });
       return NextResponse.json(
-        responseFor(evaluated.outcome, evaluated.request, evaluated.advisory),
+        responseFor(
+          evaluated.outcome,
+          evaluated.request,
+          evaluated.advisory,
+          evaluated.auditEventId,
+          evaluated.idempotencyKey,
+          evaluated.integrity,
+          evaluated.replayed,
+        ),
+        { status: statusFor(evaluated.outcome) },
       );
     }
 
     const legacy = LegacyRequestSchema.parse(body);
     const request = normalizeDecisionRequest(legacyRequest(legacy));
-    const evaluated = await evaluateWithAdvisory(
+    const evaluated = await decisionService.decide({
       request,
-      [],
-      legacy.policies.map((policy) => ({
+      policies: [],
+      idempotencyKey: legacy.idempotencyKey,
+      legacy: true,
+      policySummaries: legacy.policies.map((policy) => ({
         code: policy.code,
         description: policy.descriptionEn,
       })),
-      true,
-    );
+    });
     return NextResponse.json(
       responseFor(
         evaluated.outcome,
         evaluated.request,
         evaluated.advisory,
+        evaluated.auditEventId,
+        evaluated.idempotencyKey,
+        evaluated.integrity,
+        evaluated.replayed,
         legacy.policies.length,
       ),
+      { status: statusFor(evaluated.outcome) },
     );
   } catch (error) {
+    if (error instanceof DecisionServiceError) {
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: error.code === "IDEMPOTENCY_CONFLICT" ? 409 : 400 },
+      );
+    }
     console.error(
       "AXON deterministic decision API error:",
       error instanceof Error ? error.message : "UNKNOWN",

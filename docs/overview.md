@@ -8,6 +8,6 @@
 Modern AI agents and IDEs (Cursor, Claude Code, Antigravity) have powerful capabilities to write code, install dependencies, and run terminal commands. However, they lack organizational awareness. They do not know if a package is forbidden by the company's security policy, or if modifying a specific database schema requires senior engineering review.
 
 ## The Solution
-AXON serves as an external, objective Decision Engine. Before an agent executes a risky action, it consults AXON. AXON reviews the requested action against the organization's policies using Google's Gemini models and web grounding, and deterministically decides if the agent should proceed.
+AXON serves as an external, objective Decision Engine. Before an agent executes a risky action, it consults AXON. AXON can use Google's Gemini models to interpret bounded action data and supplied evidence, while the server-owned deterministic kernel decides if the agent should proceed.
 
 This decoupling means your agents can be completely agnostic of complex corporate governance rules, while AXON maintains the ultimate "Yes/No" authority.

@@ -5,8 +5,12 @@ The repository is structured to prioritize a clean separation between the server
 ```text
 ├── app/
 │   ├── api/
-│   │   └── decide/
-│   │       └── route.ts         # The core Next.js Serverless Route. Houses the Gemini SDK and handles all evaluations.
+│   │   ├── decide/
+│   │   │   └── route.ts         # Thin API boundary for structured and legacy decision requests.
+│   │   ├── audit/
+│   │   │   └── route.ts         # Server-owned audit read endpoint.
+│   │   └── review/
+│   │       └── route.ts         # Append-only APPROVE/REJECT review endpoint.
 │   ├── globals.css              # Global styles, Tailwind v4 theme configurations, and custom CSS variables.
 │   ├── layout.tsx               # Root Layout providing React Context wrappers, font loading, and HTML framing.
 │   └── page.tsx                 # The primary AXON Dashboard UI. Contains the visual simulator, policy manager, and system logs.
@@ -26,10 +30,17 @@ The repository is structured to prioritize a clean separation between the server
 │   ├── auth-context.tsx         # React Context managing the active User Profile (e.g. Operator vs. Reviewer).
 │   ├── axon-sdk.ts              # The external developer SDK exposing `AxonDecisionEngine` for programmatic use.
 │   ├── firebase.ts              # Firebase client initialization.
-│   ├── firestore-service.ts     # The dual-layer storage module (Firestore with robust `localStorage` failover).
+│   ├── firestore-service.ts     # Browser policy adapter and server-audit read/review client; no authoritative audit writes.
 │   ├── i18n.tsx                 # Core translation dictionaries and RTL logic for bilingual support.
 │   ├── scenarios.ts             # Static mocked scenarios used for rapid UI testing and demonstrations.
 │   └── utils.ts                 # Utility functions (e.g. Tailwind class mergers).
+│
+├── server/
+│   ├── advisory-provider.ts      # Bounded Gemini advisory provider and strict interpretation parsing.
+│   ├── audit-repository.ts       # Server-owned process-local append-only repository.
+│   ├── audit-types.ts            # Audit, integrity, and review event contracts.
+│   ├── decision-service.ts       # Normalize, reconcile, evaluate, idempotency, and audit-before-return workflow.
+│   └── hash.ts                   # Stable canonical JSON and SHA-256 hashing.
 │
 ├── .agents/skills/              # Integration folder: Contains the `SKILL.md` file for Google Antigravity agents.
 ├── .claude/skills/              # Integration folder: Contains the `SKILL.md` file for Anthropic's Claude Code CLI.

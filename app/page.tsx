@@ -59,9 +59,7 @@ import { useSpeech } from '../hooks/use-speech';
 import { evaluationScenarios } from '../lib/scenarios';
 import { 
   fetchAuditHistory, 
-  addAuditLog, 
   fetchEscalatedQueue, 
-  addEscalatedQueue, 
   updateEscalatedDecision, 
   fetchPolicies, 
   savePolicies,
@@ -257,127 +255,14 @@ export default function AXONDashboard() {
       const result = await response.json();
       
       setActiveAnalysis(result);
-
-      // Save to audit logs (Firestore/localStorage)
-      const logId = await addAuditLog({
-        prompt: targetPrompt,
-        category,
-        decision: result.decision,
-        riskScore: result.riskScore,
-        reasonEn: result.reasonEn,
-        reasonAr: result.reasonAr,
-        mitigationEn: result.mitigationEn,
-        mitigationAr: result.mitigationAr,
-        groundingEn: result.groundingEn,
-        groundingAr: result.groundingAr,
-        citations: result.citations || [],
-        matchedPolicyCodes: result.matchedPolicyCodes || [],
-        requestClassificationEn: result.requestClassificationEn,
-        requestClassificationAr: result.requestClassificationAr,
-        reviewerOverride: null,
-        reviewedBy: null
-      });
-
-      // If decision is Escalate, add to human review queue
-      if (result.decision === 'ESCALATE_TO_HUMAN') {
-        await addEscalatedQueue({
-          prompt: targetPrompt,
-          category,
-          riskScore: result.riskScore,
-          reasonEn: result.reasonEn,
-          reasonAr: result.reasonAr,
-          status: 'pending'
-        });
-      }
-
-      // Refresh listings
+      // The server creates the authoritative audit record before responding.
       await loadDatabaseData();
 
     } catch (e: any) {
-      console.warn("API evaluation failed, falling back to dynamic simulated analysis:", e);
-      
-      // Dynamic simulated fallback analysis in case API key is missing
-      const isDangerous = targetPrompt.toLowerCase().includes('bypass') || 
-                          targetPrompt.toLowerCase().includes('truncate') || 
-                          targetPrompt.toLowerCase().includes('ssh') || 
-                          targetPrompt.toLowerCase().includes('without');
-      
-      const hasUpgrade = targetPrompt.toLowerCase().includes('upgrade') || 
-                         targetPrompt.toLowerCase().includes('update');
-
-      let fallbackResult: any = {};
-      if (isDangerous) {
-        fallbackResult = {
-          decision: 'DENY',
-          riskScore: 95,
-          reasonEn: "Action directly violates policy [R3/R4]. Unauthorized production table deletion or unapproved bypass of access controls detected.",
-          reasonAr: "ينتهك الإجراء بشكل مباشر سياسة الأمن [R3/R4]. تم اكتشاف حذف غير مصرح به لجداول الإنتاج أو تجاوز غير معتمد لضوابط الوصول الإضافية.",
-          mitigationEn: "Action is denied. Create an official compliance ticket and obtain multi-reviewer sign-off.",
-          mitigationAr: "تم رفض الإجراء بالكامل. يرجى إنشاء طلب امتثال رسمي عبر القنوات المعتمدة والحصول على موافقة خطية.",
-          groundingEn: "Direct policy conflict with active guardrails. Zero trust controls prohibit bypass scripts.",
-          groundingAr: "تعارض مباشر مع السياسات النشطة. تمنع أنظمة الثقة الصفرية تشغيل برمجيات التجاوز غير المعتمدة.",
-          citations: []
-        };
-      } else if (hasUpgrade) {
-        fallbackResult = {
-          decision: 'ESCALATE_TO_HUMAN',
-          riskScore: 85,
-          reasonEn: "The requested version contains breaking changes to core signatures. Risk of production downtime.",
-          reasonAr: "يحتوي الإصدار المطلوب على تغييرات جذرية في التواقيع البرمجية الأساسية. خطر تعطل بيئة الإنتاج الحية.",
-          mitigationEn: "Apply minor patch v2.4.8 instead to resolve immediate security vulnerabilities safely.",
-          mitigationAr: "قم بتطبيق الرقعة الأحدث v2.4.8 بدلاً من ذلك لمعالجة الثغرات الأمنية الفورية بأمان.",
-          groundingEn: "Version changes check indicates breaking dependencies. Verified 10m ago.",
-          groundingAr: "يشير فحص تغييرات الإصدار إلى تعارض في الاعتمادات والارتباطات البرمجية. تم التحقق قبل 10 دقائق.",
-          citations: []
-        };
-      } else {
-        fallbackResult = {
-          decision: 'ALLOW',
-          riskScore: 12,
-          reasonEn: "Standard low-risk operational request. No policy conflicts detected. Action logged safely.",
-          reasonAr: "طلب تشغيلي اعتيادي منخفض المخاطر. لا توجد تعارضات مع السياسات الأمنية. تم تسجيل الإجراء بأمان.",
-          mitigationEn: "Proceed via standard automated deployment pipeline.",
-          mitigationAr: "تابع التنفيذ عبر مسار النشر الآلي القياسي بنجاح.",
-          groundingEn: "Automated analysis verified clean history and compliant dependencies.",
-          groundingAr: "أكد التحليل الآلي نظافة سجل المعاملات وتوافق جميع المكتبات البرمجية المرفقة.",
-          citations: []
-        };
-      }
-
-      setActiveAnalysis(fallbackResult);
-
-      // Save to local logs
-      await addAuditLog({
-        prompt: targetPrompt,
-        category,
-        decision: fallbackResult.decision,
-        riskScore: fallbackResult.riskScore,
-        reasonEn: fallbackResult.reasonEn,
-        reasonAr: fallbackResult.reasonAr,
-        mitigationEn: fallbackResult.mitigationEn,
-        mitigationAr: fallbackResult.mitigationAr,
-        groundingEn: fallbackResult.groundingEn,
-        groundingAr: fallbackResult.groundingAr,
-        citations: [],
-        matchedPolicyCodes: [],
-        requestClassificationEn: 'N/A',
-        requestClassificationAr: 'غير متوفر',
-        reviewerOverride: null,
-        reviewedBy: null
-      });
-
-      if (fallbackResult.decision === 'ESCALATE_TO_HUMAN') {
-        await addEscalatedQueue({
-          prompt: targetPrompt,
-          category,
-          riskScore: fallbackResult.riskScore,
-          reasonEn: fallbackResult.reasonEn,
-          reasonAr: fallbackResult.reasonAr,
-          status: 'pending'
-        });
-      }
-
-      await loadDatabaseData();
+      console.warn("API evaluation failed; no client-side decision or audit fallback was created:", e);
+      setNotification(language === 'en'
+        ? 'The server could not complete and audit this decision.'
+        : 'تعذر على الخادم إكمال القرار وتسجيله في سجل التدقيق.');
     } finally {
       setIsEvaluating(false);
     }
@@ -386,7 +271,13 @@ export default function AXONDashboard() {
   // Human reviewer override / clear decisions
   const handleReviewAction = async (id: string, status: 'approved' | 'rejected') => {
     try {
-      await updateEscalatedDecision(id, status, reviewComment || 'Cleared by Governance Reviewer.');
+      const reviewItem = escalatedQueue.find((item) => item.id === id);
+      await updateEscalatedDecision(
+        id,
+        status,
+        reviewComment || 'Cleared by Governance Reviewer.',
+        reviewItem?.requestId,
+      );
       setReviewComment('');
       setNotification(language === 'en' ? 'Decision override successfully applied.' : 'تم تطبيق قرار المراجعة والاعتماد بنجاح.');
       setTimeout(() => setNotification(''), 3000);
@@ -1275,7 +1166,7 @@ export default function AXONDashboard() {
                         </span>
                       </div>
                       <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
-                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Search Grounding' : 'البحث الميداني'}</span>
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Supplied Evidence' : 'الأدلة المقدمة'}</span>
                         <span className="font-semibold text-[var(--text-main)] truncate">
                           {(activeAnalysis.citations && activeAnalysis.citations.length > 0) ? (language === 'en' ? 'Utilized' : 'مستخدم') : (language === 'en' ? 'Not Required' : 'غير مطلوب')}
                         </span>
