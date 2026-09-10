@@ -12,6 +12,7 @@ export function selectDecisionState(
   policyEvaluations: PolicyEvaluation[],
   signals: {
     missingInformation: string[];
+    uncertainty?: string[];
     staleEvidence: boolean;
     conflictingEvidence: boolean;
     requiredApprovalMissing: boolean;
@@ -22,6 +23,10 @@ export function selectDecisionState(
       .filter((evaluation) => evaluation.matched)
       .map((evaluation) => evaluation.effect),
   ];
+
+  if (signals.uncertainty?.some((code) => [
+    "POLICY_COVERAGE_UNRESOLVED", "SAFETY_SEMANTICS_UNRESOLVED", "REQUIRED_EVIDENCE_UNAVAILABLE",
+  ].includes(code))) candidates.push("DEFER");
 
   if (signals.missingInformation.length) candidates.push("ASK");
   if (signals.staleEvidence || signals.conflictingEvidence) {

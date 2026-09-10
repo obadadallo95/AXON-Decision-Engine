@@ -61,11 +61,12 @@ curl -X POST http://localhost:3000/api/decide \
   }'
 ```
 
-You should receive a structured JSON response containing the legacy projection and server-owned audit metadata:
+This legacy prose request has no executable policy authority. It should return `DEFER` with `POLICY_COVERAGE_UNRESOLVED`, even though its prose describes human review. The response includes the legacy projection and server-owned audit metadata (excerpt):
 ```json
 {
   "decision": "ESCALATE_TO_HUMAN",
-  "authoritativeDecision": "ESCALATE",
+  "state": "DEFER",
+  "authoritativeDecision": { "state": "DEFER" },
   "auditEventId": "decision_...",
   "idempotencyKey": "request_...",
   "integrity": {
@@ -79,6 +80,8 @@ You should receive a structured JSON response containing the legacy projection a
   ...
 }
 ```
+
+The legacy `decision` field projects `DEFER` to `ESCALATE_TO_HUMAN`; use canonical `state` to distinguish waiting from human review.
 
 Repeat structured requests with the same `idempotencyKey` to replay the original decision and audit identity. Reusing that key with different normalized input or policies returns `IDEMPOTENCY_CONFLICT`. Requests using the legacy payload without a key receive a request-scoped compatibility key.
 

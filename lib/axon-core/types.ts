@@ -73,6 +73,7 @@ export interface EvidenceItem {
 export type EvidenceAssessmentKind = "supports" | "contradicts" | "uncertain";
 
 export interface EvidenceAssessment {
+  conflictsWithEvidenceIds?: string[];
   evidenceId: string;
   assessment: EvidenceAssessmentKind;
   confidence: number;

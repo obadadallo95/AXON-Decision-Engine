@@ -27,6 +27,7 @@ The current repository uses a process-local server-owned repository. It is suita
 The Next.js route is intentionally thin. `server/decision-service.ts` owns the request lifecycle and writes the audit record before returning the decision.
 
 - **Normalization and idempotency**: Requests and policy rules are normalized and hashed. A structured request may supply an idempotency key; legacy requests receive a request-scoped compatibility key.
+- **Policy authority**: `server/policy-registry.ts` validates the three typed domains and selects server-owned rules. Public callers cannot inject rules; legacy prose has unresolved coverage and cannot execute. Enabled rules require their named evidence IDs even when unmatched. See [Decision authority](decision-authority.md).
 - **Bounded interpretation**: Gemini receives the request, explicit signals, evidence, and policy summaries. Its output is advisory and cannot select the final state.
 - **Deterministic authority**: Explicit signals are reconciled with advisory interpretation, then the policy kernel selects `EXECUTE`, `ASK`, `DEFER`, `ESCALATE`, or `REFUSE`.
 - **Audit-before-return**: The service appends a decision record containing normalized input, signals, policy authority, outcome, model metadata, and integrity hashes before returning a normal result.

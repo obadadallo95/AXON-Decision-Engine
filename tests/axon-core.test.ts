@@ -52,7 +52,7 @@ const hardRefuse: PolicyRule = {
 
 describe("AXON deterministic core", () => {
   it("returns EXECUTE for a complete low-risk action", () => {
-    const result = evaluateDecision(request(), []);
+    const result = evaluateDecision(request(), [hardRefuse]);
     expect(result.state).toBe("EXECUTE");
     expect(result.authoritative).toBe("deterministic");
     expect(DecisionOutcomeSchema.parse(result)).toEqual(result);
@@ -66,7 +66,7 @@ describe("AXON deterministic core", () => {
           requiredFacts: ["changeWindow"],
         },
       }),
-      [],
+      [hardRefuse],
     );
     expect(result.state).toBe("ASK");
     expect(result.missingInformation).toEqual(["changeWindow"]);
@@ -80,7 +80,7 @@ describe("AXON deterministic core", () => {
           evidence: { stale: true, conflicting: false },
         },
       }),
-      [],
+      [hardRefuse],
     );
     expect(result.state).toBe("DEFER");
     expect(result.reasonCodes).toContain("STALE_EVIDENCE");
@@ -96,7 +96,7 @@ describe("AXON deterministic core", () => {
           requiredApprovals: ["security-review"],
         },
       }),
-      [],
+      [hardRefuse],
     );
     expect(result.state).toBe("ESCALATE");
     expect(result.riskScore).toBeGreaterThan(0);
@@ -144,7 +144,7 @@ describe("AXON deterministic core", () => {
           requiredApprovals: ["security-review"],
         },
       }),
-      [],
+      [hardRefuse],
     );
     expect(result.state).toBe("ESCALATE");
   });
@@ -158,7 +158,7 @@ describe("AXON deterministic core", () => {
           evidence: { stale: false, conflicting: true },
         },
       }),
-      [],
+      [hardRefuse],
     );
     expect(result.state).toBe("DEFER");
   });
@@ -228,6 +228,7 @@ describe("AXON deterministic core", () => {
   it("ignores disabled rules", () => {
     const result = evaluateDecision(request(), [
       { ...hardRefuse, enabled: false },
+      { ...hardRefuse, code: "ACTIVE-BOUNDARY", priority: 0 },
     ]);
     expect(result.state).toBe("EXECUTE");
     expect(result.policyEvaluations[0]).toMatchObject({

@@ -9,13 +9,13 @@ AXON provides both a REST API and a native TypeScript SDK, allowing you to wrap 
 **Endpoint**: `POST /api/decide`  
 **Auth**: `Bearer <AXON_API_KEY>` (Optional if disabled)
 
-### Request Payload (`application/json`)
+### Legacy Request Payload (`application/json`)
 ```typescript
 interface DecisionRequest {
   prompt: string;                      // The action to execute (e.g. "npm install lodash")
   idempotencyKey?: string;             // Replays the same audit identity for the same normalized input
   context?: Record<string, any>;       // Optional: Contextual metadata (environment, user, etc.)
-  policies?: SecurityPolicy[];         // Optional: Dynamic policies. If omitted, uses global policies.
+  policies?: SecurityPolicy[];         // Legacy prose only; never executable policy authority.
 }
 ```
 
@@ -47,7 +47,9 @@ interface DecisionResult {
 }
 ```
 
-The legacy payload is compatibility-oriented. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the response's `authoritativeDecision` and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
+The legacy payload is compatibility-oriented and cannot authorize execution, even with favorable advisory output or prose policies. It returns `DEFER` for unresolved coverage unless a stronger blocker applies. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the response's `authoritativeDecision` and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
+
+Structured requests accept `action`, full typed `context`, `requestId`, optional `idempotencyKey`, and optional `policySetId` (a registered domain or current version). The server validates domain parameters and resolves its own rules. A `policies` property in structured input returns HTTP 400 `CALLER_POLICY_AUTHORITY_NOT_ALLOWED`. Unknown domains, invalid domain coverage, or mismatched selectors cannot execute. See [Decision authority](decision-authority.md) for schemas, evidence requirements, and outage behavior.
 
 ### Multi-domain scenario API
 

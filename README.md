@@ -101,36 +101,12 @@ The AXON UI dashboard and the `/api/decide` kernel are now live at `http://local
 AXON is built to be integrated directly into your existing AI workflows. We provide a native SDK, raw API access, and drop-in integration skills for leading AI IDEs and agents.
 
 ### 1. API Usage
-If your agent or pipeline can run `curl`, it can use AXON.
+Use a registered scenario to exercise the server-owned policy boundary. For structured `/api/decide` requests, supply the full typed domain parameters described in [Decision authority](docs/decision-authority.md); caller-supplied `policies` are rejected.
 
 ```bash
-curl -X POST http://localhost:3000/api/decide \
+curl -X POST http://localhost:3000/api/scenarios/run \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer axn_live_a1b2c3d4e5f6g7h8" \
-  -d '{
-    "requestId": "req-docs-001",
-    "idempotencyKey": "docs-example-001",
-    "action": {
-      "domain": "dependency",
-      "operation": "install",
-      "target": "lodash@4.17.20",
-      "parameters": { "destructive": false }
-    },
-    "context": {
-      "environment": "development",
-      "actor": { "id": "docs-client", "role": "operator" },
-      "approvals": [],
-      "requiredApprovals": [],
-      "requiredFacts": [],
-      "reversibility": "reversible",
-      "blastRadius": "low",
-      "costOfWrong": "medium",
-      "requestedAt": "2026-09-10T10:00:00.000Z",
-      "additionalFacts": {},
-      "evidence": { "stale": false, "conflicting": false }
-    },
-    "policies": []
-  }'
+  -d '{"scenarioId":"deploy-safe-release"}'
 ```
 
 **Example JSON Response:**
@@ -140,14 +116,14 @@ curl -X POST http://localhost:3000/api/decide \
   "state": "EXECUTE",
   "authoritativeDecision": { "state": "EXECUTE", "authoritative": "deterministic" },
   "auditEventId": "decision_...",
-  "idempotencyKey": "docs-example-001",
+  "idempotencyKey": "request_...",
   "replayed": false,
   "integrity": { "inputHash": "...", "signalsHash": "...", "policyHash": "...", "outcomeHash": "...", "advisoryHash": "...", "eventHash": "..." }
 }
 ```
 
 ### 2. TypeScript SDK
-Import the drop-in TypeScript SDK directly into your node applications.
+The SDK currently sends the legacy prose payload. It remains compatible for interpretation, but cannot authorize execution: unresolved policy coverage returns `DEFER` (or a stronger blocker).
 
 ```typescript
 import { axon } from './lib/axon-sdk';
@@ -220,6 +196,7 @@ Enforces policy-compliant execution for Antigravity autonomous agents.
 For deep-dive technical details, explore the documentation:
 - [System Architecture](docs/architecture.md)
 - [SDK & API Reference](docs/sdk-reference.md)
+- [Decision authority and evidence requirements](docs/decision-authority.md)
 - [Complete Setup Guide](docs/setup.md)
 - [Detailed File Structure](docs/file-structure.md)
 - [Product Roadmap](docs/roadmap.md)

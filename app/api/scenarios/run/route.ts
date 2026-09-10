@@ -52,9 +52,8 @@ export async function POST(request: NextRequest) {
     const scenarioRequest = adaptScenario(scenario);
     const evaluated = await decisionService.decide({
       request: scenarioRequest,
-      policies: scenario.policies,
+      policySetId: scenario.policyVersion,
       idempotencyKey: body.idempotencyKey ?? `scenario-${scenario.id}`,
-      policyVersion: scenario.policyVersion,
     });
     const reasonCodes = evaluated.outcome.reasonCodes.length
       ? evaluated.outcome.reasonCodes.join(", ")

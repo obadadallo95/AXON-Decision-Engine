@@ -1,6 +1,6 @@
 import type { PolicyRule } from "@/lib/axon-core";
 
-export const REFUND_APPROVAL_POLICY_VERSION = "refund-approval.v1";
+export const REFUND_APPROVAL_POLICY_VERSION = "refund-approval.v2";
 
 export const refundApprovalPolicies: PolicyRule[] = [
   {
@@ -57,5 +57,50 @@ export const refundApprovalPolicies: PolicyRule[] = [
     conditions: [
       { field: "signals.requiredApprovalMissing", operator: "equals", value: true },
     ],
+  },
+  {
+    code: "FR-PAYMENT-FAILED",
+    description: "A failed payment was not captured and cannot be refunded.",
+    priority: 85,
+    enabled: true,
+    hard: true,
+    effect: "REFUSE",
+    conditions: [
+      {
+        field: "action.parameters.paymentStatus",
+        operator: "equals",
+        value: "failed"
+      }
+    ]
+  },
+  {
+    code: "FR-PAYMENT-PENDING",
+    description: "Pending settlement must complete before a refund.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.parameters.paymentStatus",
+        operator: "equals",
+        value: "pending"
+      }
+    ]
+  },
+  {
+    code: "FR-PAYMENT-UNKNOWN",
+    description: "Refunds wait until processor payment status is known.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.parameters.paymentStatus",
+        operator: "equals",
+        value: "unknown"
+      }
+    ]
   },
 ];

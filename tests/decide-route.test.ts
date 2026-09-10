@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { adaptScenario, getScenario } from "@/lib/domains";
 import { POST } from "@/app/api/decide/route";
 
 const context = {
@@ -22,31 +23,8 @@ describe("/api/decide deterministic boundary", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          ...adaptScenario(getScenario("deploy-unsigned-artifact")!),
           requestId: "req-route-001",
-          action: {
-            domain: "deployment",
-            operation: "delete-production-resource",
-            target: "production/checkout",
-            parameters: { prohibited: true, destructive: true },
-          },
-          context,
-          policies: [
-            {
-              code: "BLOCK-ROUTE",
-              description: "This operation is prohibited.",
-              priority: 100,
-              enabled: true,
-              hard: true,
-              effect: "REFUSE",
-              conditions: [
-                {
-                  field: "action.parameters.prohibited",
-                  operator: "equals",
-                  value: true,
-                },
-              ],
-            },
-          ],
         }),
       }) as never,
     );
@@ -74,8 +52,8 @@ describe("/api/decide deterministic boundary", () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
-    expect(result.state).toBe("ASK");
-    expect(result.decision).toBe("NEEDS_CLARIFICATION");
+    expect(result.state).toBe("DEFER");
+    expect(result.outcome.reasonCodes).toContain("POLICY_COVERAGE_UNRESOLVED");
     expect(result.execute).toBe(false);
     expect(result.auditEventId).toMatch(/^decision_/);
     expect(result.idempotencyKey).toMatch(/^legacy-/);
@@ -83,22 +61,9 @@ describe("/api/decide deterministic boundary", () => {
 
   it("replays the same server audit identity for a structured idempotency key", async () => {
     const body = {
+      ...adaptScenario(getScenario("deploy-safe-release")!),
       requestId: "req-route-idempotency-001",
       idempotencyKey: "route-idempotency-001",
-      action: {
-        domain: "deployment",
-        operation: "publish-canary",
-        target: "staging/checkout",
-        parameters: {},
-      },
-      context: {
-        ...context,
-        environment: "staging",
-        reversibility: "reversible",
-        blastRadius: "low",
-        costOfWrong: "low",
-      },
-      policies: [],
     };
     const firstResponse = await POST(
       new Request("http://localhost:3000/api/decide", {

@@ -115,6 +115,8 @@ const hardRefuse: PolicyRule = {
   ],
 };
 
+const knownPolicy: PolicyRule = { ...hardRefuse, code: "KNOWN-BOUNDARY" };
+
 const reviewableRequest = request({
   context: {
     ...request().context,
@@ -132,7 +134,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: request(),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-create-001",
     });
 
@@ -145,7 +147,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: request({ action: { ...request().action, domain: " DEPLOYMENT " } }),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-normalized-001",
     });
 
@@ -157,7 +159,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: request(),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-signals-001",
     });
 
@@ -183,7 +185,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: request(),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-outcome-001",
     });
 
@@ -197,8 +199,8 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const calls = { count: 0 };
     const service = serviceFor(repository, advisory(), calls);
-    const first = await service.decide({ request: request(), policies: [], idempotencyKey: "idem-replay-001" });
-    const second = await service.decide({ request: request(), policies: [], idempotencyKey: "idem-replay-001" });
+    const first = await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-replay-001" });
+    const second = await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-replay-001" });
 
     expect(second.replayed).toBe(true);
     expect(second.auditEventId).toBe(first.auditEventId);
@@ -209,12 +211,12 @@ describe("Stage 3 server-owned audit workflow", () => {
   it("rejects the same idempotency key for different normalized input", async () => {
     const repository = new InMemoryAuditRepository();
     const service = serviceFor(repository);
-    await service.decide({ request: request(), policies: [], idempotencyKey: "idem-conflict-001" });
+    await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-conflict-001" });
 
     await expect(
       service.decide({
         request: request({ action: { ...request().action, operation: "delete-records" } }),
-        policies: [],
+        policies: [knownPolicy],
         idempotencyKey: "idem-conflict-001",
       }),
     ).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
@@ -225,7 +227,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const service = serviceFor(repository);
     await service.decide({
       request: request(),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-legacy-policy-conflict-001",
       legacy: true,
       policySummaries: [{ code: "LEGACY-1", description: "Original summary." }],
@@ -234,7 +236,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     await expect(
       service.decide({
         request: request(),
-        policies: [],
+        policies: [knownPolicy],
         idempotencyKey: "idem-legacy-policy-conflict-001",
         legacy: true,
         policySummaries: [{ code: "LEGACY-1", description: "Changed summary." }],
@@ -245,8 +247,8 @@ describe("Stage 3 server-owned audit workflow", () => {
   it("does not create a second authoritative event on replay", async () => {
     const repository = new InMemoryAuditRepository();
     const service = serviceFor(repository);
-    await service.decide({ request: request(), policies: [], idempotencyKey: "idem-single-event-001" });
-    await service.decide({ request: request(), policies: [], idempotencyKey: "idem-single-event-001" });
+    await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-single-event-001" });
+    await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-single-event-001" });
 
     expect(await repository.listRecentAuditRecords()).toHaveLength(1);
   });
@@ -255,7 +257,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository({ available: false });
     const result = await serviceFor(repository).decide({
       request: request(),
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-audit-failure-001",
     });
 
@@ -280,7 +282,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: reviewableRequest,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-review-approve-001",
     });
     const review = await repository.appendReviewEvent({
@@ -301,7 +303,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: reviewableRequest,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-review-reject-001",
     });
     const review = await repository.appendReviewEvent({
@@ -344,7 +346,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: input,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: `idem-review-${_state.toLowerCase()}`,
     });
     expect(result.outcome.state).toBe(_state);
@@ -365,7 +367,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: reviewableRequest,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-review-duplicate-001",
     });
     const input = {
@@ -387,7 +389,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: reviewableRequest,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-review-race-001",
     });
     const base = {
@@ -411,7 +413,7 @@ describe("Stage 3 server-owned audit workflow", () => {
     const repository = new InMemoryAuditRepository();
     const result = await serviceFor(repository).decide({
       request: reviewableRequest,
-      policies: [],
+      policies: [knownPolicy],
       idempotencyKey: "idem-review-immutable-001",
     });
     const originalHash = result.integrity.outcomeHash;
@@ -439,8 +441,8 @@ describe("Stage 3 server-owned audit workflow", () => {
         return () => `2026-09-10T10:0${index++}:00.000Z`;
       })(),
     });
-    const first = await service.decide({ request: request({ requestId: "req-history-1", context: { ...request().context, requiredApprovals: ["security-review"] } }), policies: [], idempotencyKey: "idem-history-1" });
-    await service.decide({ request: request({ requestId: "req-history-2", context: { ...request().context, requiredApprovals: ["security-review"] } }), policies: [], idempotencyKey: "idem-history-2" });
+    const first = await service.decide({ request: request({ requestId: "req-history-1", context: { ...request().context, requiredApprovals: ["security-review"] } }), policies: [knownPolicy], idempotencyKey: "idem-history-1" });
+    await service.decide({ request: request({ requestId: "req-history-2", context: { ...request().context, requiredApprovals: ["security-review"] } }), policies: [knownPolicy], idempotencyKey: "idem-history-2" });
     const records = await repository.listRecentAuditRecords();
 
     expect(records.map((record) => record.requestId)).toEqual(["req-history-2", "req-history-1"]);
@@ -465,8 +467,8 @@ describe("Stage 3 server-owned audit workflow", () => {
   it("changes the input hash when normalized input changes", async () => {
     const repository = new InMemoryAuditRepository();
     const service = serviceFor(repository);
-    const first = await service.decide({ request: request(), policies: [], idempotencyKey: "idem-hash-input-1" });
-    const second = await service.decide({ request: request({ action: { ...request().action, operation: "read-status" } }), policies: [], idempotencyKey: "idem-hash-input-2" });
+    const first = await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-hash-input-1" });
+    const second = await service.decide({ request: request({ action: { ...request().action, operation: "read-status" } }), policies: [knownPolicy], idempotencyKey: "idem-hash-input-2" });
 
     expect(first.integrity.inputHash).not.toBe(second.integrity.inputHash);
   });
@@ -474,7 +476,7 @@ describe("Stage 3 server-owned audit workflow", () => {
   it("changes the policy hash when the active policy set changes", async () => {
     const repository = new InMemoryAuditRepository();
     const service = serviceFor(repository);
-    const first = await service.decide({ request: request(), policies: [], idempotencyKey: "idem-hash-policy-1" });
+    const first = await service.decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-hash-policy-1" });
     const second = await service.decide({ request: request(), policies: [hardRefuse], idempotencyKey: "idem-hash-policy-2" });
 
     expect(first.integrity.policyHash).not.toBe(second.integrity.policyHash);
@@ -483,7 +485,7 @@ describe("Stage 3 server-owned audit workflow", () => {
   it("does not store API secrets in Gemini metadata", async () => {
     process.env.GEMINI_API_KEY = "super-secret-test-key";
     const repository = new InMemoryAuditRepository();
-    const result = await serviceFor(repository).decide({ request: request(), policies: [], idempotencyKey: "idem-secret-001" });
+    const result = await serviceFor(repository).decide({ request: request(), policies: [knownPolicy], idempotencyKey: "idem-secret-001" });
 
     expect(JSON.stringify(result.auditRecord)).not.toContain("super-secret-test-key");
     expect(JSON.stringify(result.auditRecord?.model)).not.toContain("GEMINI_API_KEY");
@@ -520,7 +522,7 @@ describe("Stage 3 server-owned audit workflow", () => {
   });
 
   it("retains deterministic Stage 1 semantics while recording the audit", () => {
-    const outcome = evaluateDecision(request(), []);
+    const outcome = evaluateDecision(request(), [knownPolicy]);
     expect(outcome.state).toBe("EXECUTE");
     expect(outcome.authoritative).toBe("deterministic");
   });

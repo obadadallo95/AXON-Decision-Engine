@@ -1,6 +1,6 @@
 import type { PolicyRule } from "@/lib/axon-core";
 
-export const CODE_DEPLOYMENT_POLICY_VERSION = "code-deployment.v1";
+export const CODE_DEPLOYMENT_POLICY_VERSION = "code-deployment.v2";
 
 export const codeDeploymentPolicies: PolicyRule[] = [
   {
@@ -60,5 +60,35 @@ export const codeDeploymentPolicies: PolicyRule[] = [
     conditions: [
       { field: "action.parameters.changeTicketId", operator: "equals", value: null },
     ],
+  },
+  {
+    code: "CD-CLOSED-WINDOW",
+    description: "Deployment waits until the deployment window opens.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.parameters.deploymentWindowOpen",
+        operator: "equals",
+        value: false
+      }
+    ]
+  },
+  {
+    code: "CD-DEPENDENCY-NOT-HEALTHY",
+    description: "Deployment waits for required dependencies to be healthy.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.parameters.dependencyHealth",
+        operator: "not_equals",
+        value: "healthy"
+      }
+    ]
   },
 ];

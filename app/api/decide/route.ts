@@ -5,7 +5,6 @@ import {
   DecisionContextInputSchema,
   normalizeDecisionRequest,
   ProposedActionSchema,
-  PolicyRuleSchema,
 } from "@/lib/axon-core";
 import type {
   DecisionRequest,
@@ -28,10 +27,9 @@ const StructuredRequestSchema = z
   .object({
     requestId: z.string().min(1).max(128),
     idempotencyKey: z.string().trim().min(1).max(128).optional(),
-    policyVersion: z.string().trim().min(1).max(128).nullable().optional(),
+    policySetId: z.string().trim().min(1).max(128).optional(),
     action: ProposedActionSchema,
     context: DecisionContextInputSchema,
-    policies: z.array(PolicyRuleSchema).max(100).default([]),
   })
   .strict();
 
@@ -96,7 +94,12 @@ function legacyRequest(input: z.infer<typeof LegacyRequestSchema>): unknown {
       domain: stringValue(context.domain, "general"),
       operation: stringValue(context.operation, "legacy.evaluate"),
       target,
-      parameters: { legacyPrompt: input.prompt },
+      parameters: {
+        legacyPrompt: input.prompt,
+        ...Object.fromEntries(["destructive", "privileged", "externallyVisible"]
+          .filter((field) => typeof context[field] === "boolean")
+          .map((field) => [field, context[field]])),
+      },
     },
     context: {
       environment: hasEnvironment ? environment : "development",
@@ -224,6 +227,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body: unknown = await req.json();
+    if (body && typeof body === "object" && "action" in body && "policies" in body) {
+      return NextResponse.json({ error: "CALLER_POLICY_AUTHORITY_NOT_ALLOWED", execute: false }, { status: 400 });
+    }
     const structured = StructuredRequestSchema.safeParse(body);
     if (structured.success) {
       const request = normalizeDecisionRequest({
@@ -233,9 +239,8 @@ export async function POST(req: NextRequest) {
       });
       const evaluated = await decisionService.decide({
         request,
-        policies: structured.data.policies,
+        policySetId: structured.data.policySetId,
         idempotencyKey: structured.data.idempotencyKey,
-        policyVersion: structured.data.policyVersion,
       });
       return NextResponse.json(
         responseFor(
@@ -255,9 +260,10 @@ export async function POST(req: NextRequest) {
     const request = normalizeDecisionRequest(legacyRequest(legacy));
     const evaluated = await decisionService.decide({
       request,
-      policies: [],
       idempotencyKey: legacy.idempotencyKey,
       legacy: true,
+      missingContextFields: ["environment", "reversibility", "blastRadius", "costOfWrong"]
+        .filter((field) => legacy.context[field] === undefined),
       policySummaries: legacy.policies.map((policy) => ({
         code: policy.code,
         description: policy.descriptionEn,

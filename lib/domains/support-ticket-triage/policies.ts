@@ -1,6 +1,6 @@
 import type { PolicyRule } from "@/lib/axon-core";
 
-export const SUPPORT_TICKET_POLICY_VERSION = "support-ticket-triage.v1";
+export const SUPPORT_TICKET_POLICY_VERSION = "support-ticket-triage.v2";
 
 export const supportTicketTriagePolicies: PolicyRule[] = [
   {
@@ -57,5 +57,60 @@ export const supportTicketTriagePolicies: PolicyRule[] = [
     conditions: [
       { field: "action.parameters.tenantId", operator: "equals", value: null },
     ],
+  },
+  {
+    code: "TT-AUTO-ROUTE-DISABLED",
+    description: "Automatic routing is disabled; wait for routing eligibility.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.operation",
+        operator: "equals",
+        value: "route"
+      },
+      {
+        field: "action.parameters.autoRouteAllowed",
+        operator: "equals",
+        value: false
+      }
+    ]
+  },
+  {
+    code: "TT-DESTINATION-UNRESOLVED",
+    description: "Wait for the routing system to resolve a destination queue.",
+    priority: 85,
+    enabled: true,
+    hard: false,
+    effect: "DEFER",
+    conditions: [
+      {
+        field: "action.operation",
+        operator: "equals",
+        value: "route"
+      },
+      {
+        field: "action.parameters.destinationQueue",
+        operator: "equals",
+        value: null
+      }
+    ]
+  },
+  {
+    code: "TT-IDENTITY-UNVERIFIED",
+    description: "An explicitly unverified requester cannot authorize a ticket operation.",
+    priority: 85,
+    enabled: true,
+    hard: true,
+    effect: "REFUSE",
+    conditions: [
+      {
+        field: "action.parameters.requesterIdentityVerified",
+        operator: "equals",
+        value: false
+      }
+    ]
   },
 ];

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   DecisionOutcomeSchema,
+  applyPolicyRequirements,
   deriveDecisionSignals,
   evaluateDecisionWithSignals,
   normalizeDecisionRequest,
@@ -26,6 +27,8 @@ import {
 import type { AuditIntegrityMetadata, AuditRecord } from "./audit-types";
 import { hashObject, sha256 } from "./hash";
 
+import { resolvePolicyAuthority } from "./policy-registry";
+
 const DEFAULT_MODEL = "gemini-3.5-flash";
 
 export class DecisionServiceError extends Error {
@@ -37,7 +40,10 @@ export class DecisionServiceError extends Error {
 
 export interface DecisionServiceInput {
   request: DecisionRequest;
-  policies: PolicyRule[];
+  /** Trusted in-process injection only; never accepted by the public route. */
+  policies?: PolicyRule[];
+  policySetId?: string;
+  missingContextFields?: string[];
   idempotencyKey?: string;
   legacy?: boolean;
   policyVersion?: string | null;
@@ -177,10 +183,20 @@ export class DecisionService {
   }
 
   async decide(input: DecisionServiceInput): Promise<DecisionServiceResult> {
-    const request = normalizeDecisionRequest(input.request);
-    const rules = normalizePolicyRules(input.policies);
-    const inputHash = hashObject(request);
-    const policyHashValue = policyAuthorityHash(rules, input.policySummaries);
+    const originalRequest = normalizeDecisionRequest(input.request);
+    const authority = input.legacy
+      ? { request: originalRequest, policies: [], version: null }
+      : input.policies !== undefined
+        ? { request: originalRequest, policies: input.policies, version: input.policyVersion ?? null }
+        : resolvePolicyAuthority(originalRequest, input.policySetId);
+    const request = normalizeDecisionRequest(authority.request);
+    const rules = normalizePolicyRules(authority.policies);
+    const inputHash = hashObject(originalRequest);
+    const rulesHash = policyAuthorityHash(rules, input.policySummaries);
+    const policyHashValue = input.legacy || input.policySetId || input.missingContextFields?.length
+      ? hashObject({ rulesHash, legacy: input.legacy ?? false, policySetId: input.policySetId ?? null,
+          missingContextFields: input.missingContextFields ?? [] })
+      : rulesHash;
     const idempotencyKey =
       input.idempotencyKey?.trim() ||
       (input.legacy
@@ -235,7 +251,9 @@ export class DecisionService {
       request,
       advisory,
       input.legacy ?? false,
+      input.missingContextFields,
     );
+    reconciled.signals = applyPolicyRequirements(reconciled.request, rules, reconciled.signals);
     const outcome = evaluateDecisionWithSignals(
       reconciled.request,
       rules,
@@ -258,13 +276,13 @@ export class DecisionService {
       idempotencyKey,
       timestamp: this.dependencies.now(),
       actor: reconciled.request.context.actor,
-      normalizedRequest: request,
+      normalizedRequest: originalRequest,
       reconciledRequest: reconciled.request,
       explicitSignals,
       reconciledSignals: reconciled.signals,
       advisoryInterpretation: advisory,
       policyAuthority: {
-        version: input.policyVersion ?? null,
+        version: authority.version,
         codes: [
           ...rules.map((rule) => rule.code),
           ...(input.policySummaries ?? []).map((summary) => summary.code.trim().toUpperCase()),

@@ -114,10 +114,10 @@ function advisory(
 function evaluate(
   request: DecisionRequest,
   modelAdvisory: AdvisoryInterpretation,
-  rules: PolicyRule[] = [],
+  rules: PolicyRule[] = [hardRefuse],
   legacy = false,
 ) {
-  const reconciled = reconcileDecisionSignals(request, modelAdvisory, legacy);
+  const reconciled = reconcileDecisionSignals(request, modelAdvisory, legacy, legacy ? ["environment", "reversibility", "blastRadius", "costOfWrong"] : []);
   return {
     ...reconciled,
     outcome: evaluateDecisionWithSignals(
@@ -172,7 +172,7 @@ describe("bounded Gemini advisory boundary", () => {
         inferredOperation: inference("publish"),
         inferredTarget: inference("staging/checkout"),
       }),
-      [],
+      [hardRefuse],
       true,
     );
 
@@ -195,7 +195,7 @@ describe("bounded Gemini advisory boundary", () => {
         inferredBlastRadius: inference("high"),
         inferredCostOfWrong: inference("critical"),
       }),
-      [],
+      [hardRefuse],
       true,
     );
 
@@ -355,7 +355,7 @@ describe("bounded Gemini advisory boundary", () => {
       baseRequest({
         action: {
           ...baseRequest().action,
-          parameters: { destructive: true },
+          parameters: { destructive: true, privileged: false, externallyVisible: false },
         },
         context: { ...baseRequest().context, requiredFacts: ["rollbackPlan"] },
       }),
@@ -426,7 +426,7 @@ describe("bounded Gemini advisory boundary", () => {
         inferredOperation: inference("read-status"),
         inferredTarget: inference("staging/checkout"),
       }),
-      [],
+      [hardRefuse],
       true,
     );
     expect(result.outcome.state).toBe("EXECUTE");

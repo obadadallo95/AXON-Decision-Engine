@@ -49,7 +49,7 @@ function applyBooleanInference(
     if (existing !== inference.value) appendConflict(conflicts, field);
     return;
   }
-  parameters[field] = inference.value;
+  if (inference.value || usable(inference, 0.7)) parameters[field] = inference.value;
 }
 
 function applyStringInference(
@@ -122,6 +122,7 @@ export function applyAdvisoryToRequest(
   requestInput: DecisionRequest,
   advisory: AdvisoryInterpretation,
   allowLegacyInference = false,
+  missingContextFields: string[] = [],
 ): { request: DecisionRequest; conflicts: string[] } {
   const request = DecisionRequestSchema.parse(requestInput);
   const conflicts: string[] = [];
@@ -166,28 +167,28 @@ export function applyAdvisoryToRequest(
     request.context.environment,
     "environment",
     inferred.inferredEnvironment,
-    legacy,
+    legacy && missingContextFields.includes("environment"),
     conflicts,
   );
   const reversibility = applyContextInference(
     request.context.reversibility,
     "reversibility",
     inferred.inferredReversibility,
-    legacy,
+    legacy && missingContextFields.includes("reversibility"),
     conflicts,
   );
   const blastRadius = applyContextInference(
     request.context.blastRadius,
     "blastRadius",
     inferred.inferredBlastRadius,
-    legacy,
+    legacy && missingContextFields.includes("blastRadius"),
     conflicts,
   );
   const costOfWrong = applyContextInference(
     request.context.costOfWrong,
     "costOfWrong",
     inferred.inferredCostOfWrong,
-    legacy,
+    legacy && missingContextFields.includes("costOfWrong"),
     conflicts,
   );
 
@@ -222,21 +223,53 @@ export function applyAdvisoryToRequest(
   };
 }
 
+/** A structured pair of known, operation-relevant evidence IDs is required.
+ * Free-form conflictingFacts and isolated assessments are advisory only. */
+function hasMaterialEvidenceConflict(request: DecisionRequest, advisory: AdvisoryInterpretation): boolean {
+  if (advisory.status !== "success") return false;
+  const evidence = request.context.evidenceItems ?? [];
+  return advisory.evidenceAssessment.some((assessment) => {
+    if (assessment.assessment !== "contradicts" || assessment.confidence < 0.7) return false;
+    const source = evidence.find((item) => item.id === assessment.evidenceId);
+    if (!source) return false;
+    return (assessment.conflictsWithEvidenceIds ?? []).some((id) => {
+      const other = evidence.find((item) => item.id === id);
+      return other && id !== source.id &&
+        (source.supports.includes(request.action.operation) || other.supports.includes(request.action.operation));
+    });
+  });
+}
+
 export function reconcileDecisionSignals(
   requestInput: DecisionRequest,
   advisory: AdvisoryInterpretation,
   allowLegacyInference = false,
+  missingContextFields: string[] = [],
 ): ReconciledDecisionInput {
   const request = DecisionRequestSchema.parse(requestInput);
   const baseline = deriveDecisionSignals(request);
-  const applied = applyAdvisoryToRequest(request, advisory, allowLegacyInference);
+  const applied = applyAdvisoryToRequest(request, advisory, allowLegacyInference, missingContextFields);
+  const materialConflict = hasMaterialEvidenceConflict(applied.request, advisory);
+  if (materialConflict) applied.request.context.evidence.conflicting = true;
   const candidate = deriveDecisionSignals(applied.request);
   const inferred = advisory.status === "success" ? advisory.inferredSignals : null;
   const lowConfidence = inferred
     ? highImpactInference(inferred, request, allowLegacyInference)
     : [];
+  const unresolvedSafety = ["destructive", "privileged", "externallyVisible"]
+    .filter((field) => typeof applied.request.action.parameters[field] !== "boolean");
+  const contextInferences = inferred ? {
+    environment: inferred.inferredEnvironment, reversibility: inferred.inferredReversibility,
+    blastRadius: inferred.inferredBlastRadius, costOfWrong: inferred.inferredCostOfWrong,
+  } : null;
+  for (const field of missingContextFields) {
+    const inference = contextInferences?.[field as keyof typeof contextInferences];
+    if (!inference || inference.value === "unknown" || !usable(inference, 0.7)) unresolvedSafety.push(field);
+  }
   const modelMissing = advisory.status === "success" ? advisory.missingInformation : [];
   const modelUncertainty = [
+    ...(unresolvedSafety.length && advisory.status !== "success" ? ["SAFETY_SEMANTICS_UNRESOLVED"] : []),
+    ...(materialConflict ? ["MODEL_EVIDENCE_CONTRADICTION"] : []),
     ...(advisory.status === "success" && advisory.ambiguities.length
       ? ["MODEL_AMBIGUITY"]
       : []),
@@ -248,7 +281,7 @@ export function reconcileDecisionSignals(
   ];
   const missingInformation = addUnique(
     candidate.missingInformation,
-    [...modelMissing, ...lowConfidence],
+    [...modelMissing, ...lowConfidence, ...unresolvedSafety.map((field) => `safety:${field}`)],
   );
   const uncertainty = addUnique(candidate.uncertainty, [
     ...modelUncertainty,

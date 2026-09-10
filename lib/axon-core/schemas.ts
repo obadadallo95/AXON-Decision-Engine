@@ -106,6 +106,7 @@ export const AdvisoryInferredSignalsSchema = z
 
 export const EvidenceAssessmentSchema = z
   .object({
+    conflictsWithEvidenceIds: z.array(z.string().trim().min(1).max(128)).max(20).optional(),
     evidenceId: z.string().trim().min(1).max(128),
     assessment: z.enum(["supports", "contradicts", "uncertain"]),
     confidence: z.number().finite().min(0).max(1),

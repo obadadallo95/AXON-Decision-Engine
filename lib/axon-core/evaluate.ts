@@ -6,6 +6,7 @@ import {
 } from "./schemas";
 import { normalizeDecisionRequest, normalizePolicyRules } from "./normalize";
 import { evaluatePolicyRules } from "./policies";
+import { applyPolicyRequirements } from "./requirements";
 import { selectDecisionState } from "./precedence";
 import { deriveDecisionSignals } from "./signals";
 import type {
@@ -52,7 +53,7 @@ export function evaluateDecisionWithSignals(
 ): DecisionOutcome {
   const request = DecisionRequestSchema.parse(requestInput);
   const rules = inputRules.map((rule) => PolicyRuleSchema.parse(rule));
-  const signals = DecisionSignalsSchema.parse(signalsInput);
+  const signals = DecisionSignalsSchema.parse(applyPolicyRequirements(request, rules, signalsInput));
   const policyEvaluations = evaluatePolicyRules(request, signals, rules);
   const state = selectDecisionState(policyEvaluations, signals);
   const matchedRuleCodes = policyEvaluations
