@@ -23,15 +23,20 @@ The repository is structured to prioritize a clean separation between the server
 │   ├── file-structure.md        # This file.
 │   ├── overview.md              # High-level product pitch and challenge framing.
 │   ├── roadmap.md               # Future feature projections and enterprise ambitions.
+│   ├── submission.md            # Judge-facing challenge summary and integration position.
+│   ├── demo-script.md           # Practical 90-second walkthrough.
+│   ├── deliberate-failure.md    # Reproducible €4,800 refund failure case.
+│   ├── deployment.md            # Documentation-only single-process deployment plan.
+│   ├── submission-checklist.md  # Repository-complete vs external-action checklist.
 │   ├── sdk-reference.md         # API schema, SDK TypeScript documentation, and code examples.
-│   └── setup.md                 # Local installation and production deployment guide.
+│   └── setup.md                 # Local installation and single-process deployment guide.
 │
 ├── hooks/
 │   └── use-speech.ts            # A custom React Hook interfacing with the browser Web Speech API for voice dictation.
 │
 ├── lib/
 │   ├── auth-context.tsx         # React Context managing the active User Profile (e.g. Operator vs. Reviewer).
-│   ├── axon-sdk.ts              # The external developer SDK exposing `AxonDecisionEngine` for programmatic use.
+│   ├── axon-sdk.ts              # Source TypeScript client for prototype REST integration; not a published package.
 │   ├── firebase.ts              # Firebase client initialization.
 │   ├── firestore-service.ts     # Browser policy adapter and server-audit read/review client; no authoritative audit writes.
 │   ├── i18n.tsx                 # Core translation dictionaries and RTL logic for bilingual support.

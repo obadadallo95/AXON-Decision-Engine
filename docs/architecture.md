@@ -2,6 +2,8 @@
 
 AXON serves as an external, objective verification layer, decoupling security governance from AI agent execution logic.
 
+The integration boundary is intentionally simple: an agent proposes an action, AXON returns a decision and evidence, and an external integration or execution gateway enforces the result before a tool runs. The current challenge build evaluates and records decisions; it does not intercept Codex, Claude, or real tools.
+
 ## 1. System Topology
 
 ```mermaid
@@ -21,6 +23,21 @@ graph TD
 ```
 
 The current repository uses a process-local server-owned repository. It is suitable for local and single-instance demonstrations, but it is not durable across restarts or safe as a shared store across multiple instances.
+
+The authoritative pipeline is:
+
+```text
+Proposed Action + Context
+→ Validation / Normalization
+→ Explicit Signals
+→ Bounded Gemini Interpretation
+→ Signal Reconciliation
+→ Server-Owned Policy Authority
+→ Five-State Decision
+→ Server Audit Record
+```
+
+`ESCALATE` may append a review event. Gemini reasons; AXON authorizes. No real execution layer or Firestore/Postgres authoritative store is implemented in this challenge runtime.
 
 ## 2. The Core Workflow (`server/decision-service.ts`)
 

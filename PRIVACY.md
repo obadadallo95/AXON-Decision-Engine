@@ -2,7 +2,7 @@
 
 **Last Updated: June 30, 2026**
 
-AXON ("we," "our," or "us") is committed to protecting the data privacy, security, and integrity of our organizational clients and operators. This Privacy Policy describes how we collect, process, and protect action requests and operational data evaluated through our Decision Engine.
+AXON is a challenge prototype using synthetic data. This document describes the prototype’s intended data boundaries; it is not a production privacy commitment or compliance certification.
 
 ---
 
@@ -11,7 +11,7 @@ AXON ("we," "our," or "us") is committed to protecting the data privacy, securit
 To perform safety, compliance, and governance evaluations, the AXON Decision Engine processes the following information:
 - **System Action Prompts**: High-level descriptions of requested infrastructure operations (e.g., software upgrades, patch deployments, or access modifications).
 - **Voice input data**: Audio recordings captured via the client's Web Speech API are processed locally on the client's device to extract textual transcripts; AXON does not record or transmit raw audio files to external servers.
-- **Active Operational Policies**: Custom organizational guardrails configured within the Policy Engine.
+- **Server-owned scenario policies**: The challenge fixtures use registered domain policies. Free-text policy editing is not an active authorization surface.
 
 ---
 
@@ -19,28 +19,25 @@ To perform safety, compliance, and governance evaluations, the AXON Decision Eng
 
 To protect operational confidentiality:
 - All decision logic and model calls are handled strictly **server-side** (`/api/decide`). 
-- Data sent to the Gemini API is governed by enterprise safety controls.
-- Web search queries triggered during **Google Search Grounding** do not include user-identifiable keys, IP addresses, or internal network topology diagrams. Queries are generalized to software identifiers, vulnerability codes, or library names to fetch safety advisories.
+- Data sent to the optional Gemini API is limited to the bounded advisory request used by the configured runtime.
+- The challenge build does not claim Google Search Grounding, external evidence ingestion, or production enterprise controls.
 
 ---
 
 ## 3. Data Storage and Retention
 
-AXON retains evaluation records to maintain an immutable compliance trail:
-- **Audit Logs**: Stored securely in Google Cloud Firestore (or locally on client browser storage under sandbox modes) to provide team transparency.
-- **Escalated Tasks**: Retained until cleared or resolved by an authorized Human Governance Reviewer.
-- Data can be purged or archived according to organizational retention guidelines.
+AXON records decisions and append-only review events in a server-owned, process-local repository for the challenge demo:
+- **Audit Logs**: Not durable across restarts or coordinated across multiple instances; the runtime does not use Firestore as authoritative audit storage.
+- **Review identity**: Simulated for the prototype.
+- Do not use this storage model for production retention or compliance evidence.
 
 ---
 
 ## 4. Enterprise Security Controls
 
-We employ standard technical measures to protect transaction data:
-- TLS 1.3 encryption for all data-in-transit.
-- AES-256 encryption-at-rest within cloud databases.
-- Multi-role simulation constraints to restrict administrative overrides.
+The prototype does not make production encryption, identity, RBAC, or compliance claims. It provides simulated reviewer roles and server-side decision boundaries for demonstration only.
 
 ---
 
 ## 5. Contact Information
-For compliance inquiries, please contact your organization's internal safety officer or reach our team at `governance@axon-security.ai`.
+For challenge questions, use the repository issue or project contact maintained by its owner.

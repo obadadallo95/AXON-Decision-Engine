@@ -41,6 +41,15 @@ Server Audit Record
 
 **Gemini reasons. AXON authorizes.** The runtime audit repository is process-local and server-owned; it is not Firestore and is not durable across restarts or multiple instances. See [the architecture notes](docs/architecture.md) and [the architecture snapshot](assets/architecture.svg).
 
+## Submission package
+
+- [Judge-facing submission notes](docs/submission.md)
+- [90-second demo script](docs/demo-script.md)
+- [Deliberate failure: €4,800 refund](docs/deliberate-failure.md)
+- [Two-year thesis](THESIS.md)
+- [Deployment plan](docs/deployment.md)
+- [Submission checklist](docs/submission-checklist.md)
+
 ## Challenge demo
 
 The dashboard has three domains and fifteen typed scenarios:
@@ -129,10 +138,10 @@ The current audit leaves 2 advisories after the targeted same-major Next.js 15.5
 
 ## Intentionally out of scope
 
-Durable Firestore/Postgres audit storage, a published npm package, Codex or Claude integrations, MCP/shell gateways, Agent Relay, real execution adapters, and the final ≤300-word thesis are deferred until after the core challenge submission.
+Durable Firestore/Postgres audit storage, a published npm package, Codex or Claude integrations, MCP/shell gateways, Agent Relay, and real execution adapters are intentionally out of scope for this challenge prototype.
 
 ## AI tools used
 
-Google Gemini is the optional runtime advisory provider. OpenAI Codex assisted the Stage 6 repository and submission-surface work. Neither model is an authorization source; the server-owned deterministic kernel is.
+Google Gemini is the optional runtime advisory provider. OpenAI Codex assisted repository implementation, evaluation, and submission packaging. Neither model is an authorization source; the server-owned deterministic kernel is.
 
 More detail is available in [decision authority](docs/decision-authority.md), [setup notes](docs/setup.md), and [the SDK/API reference](docs/sdk-reference.md).
