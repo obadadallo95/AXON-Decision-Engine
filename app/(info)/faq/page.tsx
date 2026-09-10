@@ -26,16 +26,16 @@ const faqsEn = [
     a: "No. AXON is an operational decision-support system. While it helps enforce internal rules, it does not constitute formal legal, regulatory, or compliance advice. Human-in-the-Loop review is required for tier-0 production modifications."
   },
   {
-    q: "What is the difference between the SDK and the Skills?",
-    a: "The SDK is a TypeScript library for developers building their own tools to programmatically query the decision engine. Skills are pre-packaged configuration files that instantly bind popular AI IDEs (like Cursor) to the AXON API without writing custom code."
+    q: "What integration surface exists today?",
+    a: "AXON exposes a REST decision API and a source TypeScript client in this repository. There is no published npm package and no Codex, Claude, MCP, or execution adapter in the challenge prototype."
   },
   {
     q: "Can I use AXON with external agents?",
     a: "Yes. AXON exposes a secure `/api/decide` REST endpoint using Bearer token authentication. Any external agent, script, or CI/CD pipeline capable of making a cURL request can query the engine."
   },
   {
-    q: "What happens when an action is flagged as ESCALATE_TO_HUMAN?",
-    a: "The request is denied execution at the agent level, and a record is pushed to the AXON Review Queue. A human administrator must manually review the payload and approve or reject the action."
+    q: "What happens when an action is flagged as ESCALATE?",
+    a: "The decision is recorded and appears in the Review Queue. A simulated reviewer may append APPROVE or REJECT, but the review never executes the action or rewrites the original AXON decision."
   },
   {
     q: "How is the Audit History stored?",
@@ -65,16 +65,16 @@ const faqsAr = [
     a: "لا. أكسون هو نظام دعم قرارات تشغيلي ولا يمثل نصيحة قانونية أو تنظيمية رسمية."
   },
   {
-    q: "ما الفرق بين SDK والمهارات (Skills)؟",
-    a: "SDK هي مكتبة برمجية للمطورين. أما المهارات فهي ملفات تكوين جاهزة لربط بيئات التطوير (مثل Cursor) بواجهة أكسون دون كتابة تعليمات برمجية إضافية."
+    q: "ما هي واجهة التكامل المتاحة اليوم؟",
+    a: "يوفر أكسون واجهة REST وعميل TypeScript مصدره موجود في هذا المستودع. لا توجد حزمة npm منشورة أو تكامل Codex أو Claude أو MCP أو منفذ تنفيذ في النموذج الأولي."
   },
   {
     q: "هل يمكنني استخدام أكسون مع وكلاء خارجيين؟",
     a: "نعم. يوفر أكسون واجهة برمجة تطبيقات (REST API) آمنة يمكن لأي وكيل أو سكريبت خارجي الوصول إليها."
   },
   {
-    q: "ماذا يحدث عند تصعيد إجراء ما (ESCALATE_TO_HUMAN)؟",
-    a: "يتم إيقاف التنفيذ عند الوكيل، ويُرسل السجل إلى طابور المراجعة في أكسون ليقوم مسؤول بشري بمراجعته."
+    q: "ماذا يحدث عند تصعيد إجراء ما (ESCALATE)؟",
+    a: "يتم تسجيل القرار ويظهر في قائمة المراجعة. يمكن للمراجع المحاكى إضافة APPROVE أو REJECT، لكن المراجعة لا تنفذ الإجراء ولا تعيد كتابة قرار أكسون الأصلي."
   },
   {
     q: "كيف يتم تخزين سجل التدقيق؟",

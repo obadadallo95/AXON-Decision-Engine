@@ -66,8 +66,9 @@ The refund fixture `refund-stale-conflicting` is intentionally a failure case: o
 
 ## 6. The UI Dashboard (`app/page.tsx`)
 
-A React/Next.js interface designed to give human operators visibility into the system.
-- **Policy Management**: Operators can write, toggle, and delete security guardrails.
-- **Live Simulator**: A terminal-like interface to directly hit the API endpoint and visualize how the decision engine interprets different payloads.
-- **Audit visibility**: The dashboard reads audit and review history from the server API; it does not create or mutate authoritative decision records in the browser.
-- **Bilingual Interface**: Absolute RTL-compliant rendering utilizing advanced Tailwind CSS configurations to support both English and Arabic natively.
+A React/Next.js interface designed for the challenge flow:
+- **Scenario runner**: Three domains and fifteen typed fixtures use the same server workflow as external callers.
+- **Decision trace**: The main result shows input, signals, reasoning, outcome, evidence freshness, evidence relationships, and the server audit ID.
+- **Review visibility**: Review actions appear only for `ESCALATE`; `APPROVE` and `REJECT` append review events and never mutate the original decision.
+- **Truthful integration positioning**: The judge-facing navigation does not expose fabricated SDK telemetry, credentials, webhook persistence, or a client policy editor. AXON exposes a REST API and a source TypeScript client for prototype integration.
+- **Bilingual Interface**: RTL-compliant rendering supports English and Arabic.

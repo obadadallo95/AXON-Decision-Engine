@@ -188,4 +188,15 @@ export class InMemoryAuditRepository implements AuditRepository {
   }
 }
 
-export const serverAuditRepository: AuditRepository = new InMemoryAuditRepository();
+type AxonProcessGlobal = typeof globalThis & {
+  __axonServerAuditRepository?: AuditRepository;
+};
+
+// Next can load route handlers in separate module contexts during development.
+// A process-global reference keeps the intentionally process-local demo store
+// coherent across /api/scenarios/run, /api/audit, and /api/review without
+// pretending to provide durable or multi-instance persistence.
+const processGlobal = globalThis as AxonProcessGlobal;
+export const serverAuditRepository: AuditRepository =
+  processGlobal.__axonServerAuditRepository ??
+  (processGlobal.__axonServerAuditRepository = new InMemoryAuditRepository());

@@ -1,11 +1,11 @@
 # Setup & Deployment
 
-This guide covers how to run the AXON Decision Engine locally, test it with AI agents, and deploy it to a production environment.
+This guide covers the AXON challenge prototype locally and describes the current single-process deployment boundary.
 
 ## 1. Local Development Environment
 
 ### Prerequisites
-- **Node.js**: `v18.17.0` or higher.
+- **Node.js**: `20.19.0` or higher (the repository is tested with Node `20.19.6`).
 - **Package Manager**: `npm`, `yarn`, or `pnpm`.
 - **Google Gemini API Key**: Optional; acquire one via [Google AI Studio](https://aistudio.google.com/) to enable bounded interpretation. Deterministic evaluation remains available without it.
 - **(Optional) Firebase Account**: Used by the browser policy adapter. It is not the authoritative Stage 3 audit store.
@@ -13,13 +13,13 @@ This guide covers how to run the AXON Decision Engine locally, test it with AI a
 ### Installation
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/obadadallo95/axon-decision-engine.git
+   git clone https://github.com/obadadallo95/AXON-Decision-Engine.git
    cd axon-decision-engine
    ```
 
 2. **Install dependencies:**
    ```bash
-   npm install
+   npm ci
    ```
 
 3. **Configure Environment Variables:**
@@ -28,9 +28,11 @@ This guide covers how to run the AXON Decision Engine locally, test it with AI a
    # [OPTIONAL] Enables bounded Gemini interpretation
    GEMINI_API_KEY=your_gemini_api_key
 
-   # [OPTIONAL] Bearer token required when hitting the API externally.
-   # If omitted, the local API accepts requests without authentication.
+   # [OPTIONAL] Bearer token for external API callers. Leave empty for the browser demo.
    AXON_API_KEY=your_secure_random_key
+
+   GEMINI_ADVISORY_MODEL=gemini-3.5-flash
+   GEMINI_ADVISORY_TIMEOUT_MS=8000
    ```
 
 4. **Launch Development Server:**
@@ -43,45 +45,27 @@ This guide covers how to run the AXON Decision Engine locally, test it with AI a
 
 ## 2. Testing the Engine Locally
 
-To ensure the decision kernel is running properly, open a new terminal and fire a test curl command to your local instance:
+To ensure the decision kernel is running properly, open a new terminal and run a typed challenge scenario:
 
 ```bash
-curl -X POST http://localhost:3000/api/decide \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${AXON_API_KEY}" \
-  -d '{
-    "prompt": "Run an update on all database schemas via Prisma",
-    "policies": [
-      {
-        "id": "1",
-        "title": "DB Protection",
-        "description": "Database schema modifications require human review."
-      }
-    ]
-  }'
+curl -X POST http://localhost:3000/api/scenarios/run \
+  -H 'Content-Type: application/json' \
+  -d '{"scenarioId":"refund-stale-conflicting"}'
 ```
 
-This legacy prose request has no executable policy authority. It should return `DEFER` with `POLICY_COVERAGE_UNRESOLVED`, even though its prose describes human review. The response includes the legacy projection and server-owned audit metadata (excerpt):
+The deliberate refund should return canonical `ESCALATE`, and the response includes the real server trace and audit metadata (excerpt):
 ```json
 {
-  "decision": "ESCALATE_TO_HUMAN",
-  "state": "DEFER",
-  "authoritativeDecision": { "state": "DEFER" },
+  "state": "ESCALATE",
+  "expectedStateMatches": true,
+  "decisionTrace": { "...": "input, signals, reasoning, outcome" },
   "auditEventId": "decision_...",
-  "idempotencyKey": "request_...",
-  "integrity": {
-    "inputHash": "...",
-    "signalsHash": "...",
-    "policyHash": "...",
-    "outcomeHash": "...",
-    "advisoryHash": "...",
-    "eventHash": "..."
-  },
+  "evidence": ["..."],
   ...
 }
 ```
 
-The legacy `decision` field projects `DEFER` to `ESCALATE_TO_HUMAN`; use canonical `state` to distinguish waiting from human review.
+For structured external requests, use the server-owned `policySetId` semantics described in [Decision authority](decision-authority.md). Do not send caller-supplied `policies` to `/api/decide`; that is rejected by design. Legacy prose remains compatibility-only and cannot authorize execution.
 
 Repeat structured requests with the same `idempotencyKey` to replay the original decision and audit identity. Reusing that key with different normalized input or policies returns `IDEMPOTENCY_CONFLICT`. Requests using the legacy payload without a key receive a request-scoped compatibility key.
 
@@ -107,26 +91,17 @@ The deliberate refund fixture should return `ESCALATE`, not `EXECUTE`, and shoul
 
 ---
 
-## 3. Production Deployment
+## 3. Single-process deployment
 
-AXON is built on Next.js App Router and deploys seamlessly to Vercel, or any Node-compatible hosting provider (Render, Railway, AWS Amplify).
+AXON is built on Next.js App Router and can run on a Node-compatible single-process host.
 
 The included audit repository is process-local demo storage. It is not durable across restarts and does not coordinate multiple server instances. Use a server-side transactional adapter before deploying the audit workflow behind a load balancer. Do not treat browser Firestore or localStorage as authoritative decision storage.
 
-### Deploying to Vercel
-1. Push your repository to GitHub.
-2. Import the project in Vercel.
-3. In the Vercel Dashboard, go to **Settings > Environment Variables**.
-4. Add `GEMINI_API_KEY` and `AXON_API_KEY`.
-5. Deploy.
-
-### Building as a Docker Container or Standard Node App
-If deploying to a traditional VPS or Container Registry:
+### Deploying to a Node host
+Install the locked dependencies, inject environment variables, then:
 ```bash
-# Build the Next.js optimized payload
+npm ci
 npm run build
-
-# Start the production server
 npm start
 ```
-*Note: Ensure your environment variables are injected into the container environment prior to running `npm start`.*
+This challenge runtime uses process-local audit storage. Do not put it behind a load balancer or claim durable audit retention without adding a transactional server-side repository in a later stage.

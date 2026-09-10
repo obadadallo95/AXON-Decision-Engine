@@ -57,6 +57,7 @@ type GeminiClient = {
 type GeminiClientFactory = (apiKey: string) => GeminiClient;
 
 const MODEL = "gemini-3.5-flash";
+const DEFAULT_TIMEOUT_MS = 8_000;
 
 const SYSTEM_INSTRUCTION = [
   "You are AXON's bounded action interpretation advisor.",
@@ -284,16 +285,33 @@ export class GeminiAdvisoryProvider implements AdvisoryProvider {
 
     const model = process.env.GEMINI_ADVISORY_MODEL ?? MODEL;
     try {
-      const response = await this.clientFactory(apiKey).models.generateContent({
-        model,
-        contents: buildAdvisoryPrompt(input),
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: GEMINI_RESPONSE_SCHEMA,
-          temperature: 0,
-          maxOutputTokens: 2200,
-        },
+      const timeoutMs = Math.max(
+        1_000,
+        Number(process.env.GEMINI_ADVISORY_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
+      );
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const response = await Promise.race([
+        this.clientFactory(apiKey).models.generateContent({
+          model,
+          contents: buildAdvisoryPrompt(input),
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: "application/json",
+            responseSchema: GEMINI_RESPONSE_SCHEMA,
+            temperature: 0,
+            maxOutputTokens: 2200,
+          },
+        }),
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new AdvisoryProviderError(
+              "MODEL_UNAVAILABLE",
+              `Gemini advisory timed out after ${timeoutMs}ms.`,
+            ));
+          }, timeoutMs);
+        }),
+      ]).finally(() => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
       });
       if (!response.text) {
         throw new AdvisoryProviderError("MODEL_INVALID", "Gemini returned an empty advisory.");

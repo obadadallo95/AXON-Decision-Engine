@@ -1,6 +1,6 @@
 # SDK & API Reference
 
-AXON provides both a REST API and a native TypeScript SDK, allowing you to wrap critical infrastructure scripts or agent execution loops in policy-aware guardrails.
+AXON provides a REST decision API and a source TypeScript client in this repository. There is no published npm package in the challenge prototype.
 
 ---
 
@@ -22,8 +22,8 @@ interface DecisionRequest {
 ### Response Payload (`application/json`)
 ```typescript
 interface DecisionResult {
-  decision: 'ALLOW' | 'DENY' | 'NEEDS_CLARIFICATION' | 'ESCALATE_TO_HUMAN';
   state: 'EXECUTE' | 'ASK' | 'DEFER' | 'ESCALATE' | 'REFUSE';
+  decision?: 'ALLOW' | 'DENY' | 'NEEDS_CLARIFICATION' | 'ESCALATE_TO_HUMAN'; // compatibility projection
   authoritativeDecision: { state: DecisionResult['state']; /* plus deterministic outcome fields */ };
   auditEventId: string | null;
   idempotencyKey: string;
@@ -47,7 +47,7 @@ interface DecisionResult {
 }
 ```
 
-The legacy payload is compatibility-oriented and cannot authorize execution, even with favorable advisory output or prose policies. It returns `DEFER` for unresolved coverage unless a stronger blocker applies. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the response's `authoritativeDecision` and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
+The legacy payload is compatibility-oriented and cannot authorize execution, even with favorable advisory output or prose policies. It returns `DEFER` for unresolved coverage unless a stronger blocker applies. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the canonical `state`, `decisionTrace`, and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
 
 Structured requests accept `action`, full typed `context`, `requestId`, optional `idempotencyKey`, and optional `policySetId` (a registered domain or current version). The server validates domain parameters and resolves its own rules. A `policies` property in structured input returns HTTP 400 `CALLER_POLICY_AUTHORITY_NOT_ALLOWED`. Unknown domains, invalid domain coverage, or mismatched selectors cannot execute. See [Decision authority](decision-authority.md) for schemas, evidence requirements, and outage behavior.
 
@@ -71,7 +71,7 @@ The scenario's `expectedState` is demo validation metadata only. It is not read 
 
 ---
 
-## 2. TypeScript SDK
+## 2. Source TypeScript client
 
 The `lib/axon-sdk.ts` file exports an `AxonDecisionEngine` class and a pre-instantiated `axon` singleton. It provides robust error handling, typed responses, and environment-aware endpoint resolution.
 
@@ -92,20 +92,24 @@ async function executeAgentCommand(command: string) {
   try {
     const result = await axon.evaluateAction(request);
 
-    switch(result.decision) {
-      case 'ALLOW':
-        console.log("AXON Approved.");
+    switch(result.state) {
+      case 'EXECUTE':
+        console.log("AXON returned EXECUTE.");
         return runCommand(command);
         
-      case 'ESCALATE_TO_HUMAN':
-        console.log(`AXON Flag: Human intervention required. Reason: ${result.reasonEn}`);
+      case 'ESCALATE':
+        console.log(`AXON requires human authority. Reason: ${result.reasonEn}`);
         return requestHumanApproval();
         
-      case 'NEEDS_CLARIFICATION':
+      case 'ASK':
         console.log(`AXON Prompt: ${result.mitigationEn}`);
         return requestAgentRefinement();
         
-      case 'DENY':
+      case 'DEFER':
+        console.log(`AXON is waiting for changed conditions. Reason: ${result.reasonEn}`);
+        return requestAgentRefinement();
+
+      case 'REFUSE':
         throw new Error(`AXON Blocked: ${result.reasonEn}`);
     }
   } catch (err) {
@@ -117,17 +121,6 @@ async function executeAgentCommand(command: string) {
 
 ---
 
-## 3. Agent Integration Skills
+## 3. Integrations deferred
 
-Rather than using the SDK programmatically, you can inject AXON directly into the "system prompt" or "skill context" of AI Agents. 
-
-We provide the following drag-and-drop skills in the root of the repository:
-
-### Cursor IDE (`.cursor/rules/axon-decision.mdc`)
-Cursor Rules instruct the AI editor. By placing `axon-decision.mdc` in your target project's `.cursor/rules/` directory, Cursor's Composer will automatically `curl` your AXON endpoint to verify architectural refactors before applying them.
-
-### Claude Code (`.claude/skills/axon-decision/SKILL.md`)
-Claude Code skills grant the CLI agent new capabilities. Placing this file in your target project's `.claude/skills/` directory instructs Claude to consult AXON before making filesystem changes.
-
-### Antigravity (`.agents/skills/axon-decision-engine/SKILL.md`)
-Antigravity utilizes YAML-frontmatter markdown skills. By deploying this skill to `.agents/skills/`, Antigravity gains the `evaluate_action` directive, acting as a mandatory organizational safeguard.
+Cursor, Claude Code, Antigravity, MCP, shell gateways, and real execution adapters are intentionally deferred until after the challenge submission. The repository contains development notes for those future surfaces, but they are not part of the 90-second demo or a claim of an operational integration.

@@ -159,6 +159,7 @@ function responseFor(
   integrity: import("@/server/audit-types").AuditIntegrityMetadata,
   replayed: boolean,
   legacyPolicyCount = 0,
+  auditRecord: import("@/server/audit-types").AuditRecord | null = null,
 ) {
   const legacy = legacyDecision(outcome.state);
   const reasonCodes = outcome.reasonCodes.length
@@ -206,6 +207,38 @@ function responseFor(
     requestClassificationEn: request.action.domain,
     requestClassificationAr: "غير محدد",
     legacyPolicyCount,
+    decisionTrace: {
+      input: {
+        action: request.action,
+        context: {
+          environment: request.context.environment,
+          actor: request.context.actor,
+          approvals: request.context.approvals,
+          requiredApprovals: request.context.requiredApprovals,
+          requiredFacts: request.context.requiredFacts,
+          reversibility: request.context.reversibility,
+          blastRadius: request.context.blastRadius,
+          costOfWrong: request.context.costOfWrong,
+          requestedAt: request.context.requestedAt,
+        },
+      },
+      signals: auditRecord
+        ? { explicit: auditRecord.explicitSignals, reconciled: auditRecord.reconciledSignals }
+        : null,
+      reasoning: {
+        matchedPolicyCodes: outcome.matchedRuleCodes,
+        reasonCodes: outcome.reasonCodes,
+        policyEvaluations: outcome.policyEvaluations,
+        advisoryStatus: advisory.status,
+        advisorySummary: advisory.reasoningSummary,
+      },
+      outcome: {
+        state: outcome.state,
+        confidence: outcome.confidence,
+        uncertainty: outcome.uncertainty,
+        auditEventId,
+      },
+    },
   };
 }
 
@@ -251,6 +284,8 @@ export async function POST(req: NextRequest) {
           evaluated.idempotencyKey,
           evaluated.integrity,
           evaluated.replayed,
+          0,
+          evaluated.auditRecord,
         ),
         { status: statusFor(evaluated.outcome) },
       );
@@ -279,6 +314,7 @@ export async function POST(req: NextRequest) {
         evaluated.integrity,
         evaluated.replayed,
         legacy.policies.length,
+        evaluated.auditRecord,
       ),
       { status: statusFor(evaluated.outcome) },
     );

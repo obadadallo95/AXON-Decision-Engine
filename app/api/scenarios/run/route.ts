@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       : "NONE";
     const metadata = metadataOf(scenario);
     const executable = evaluated.outcome.state === "EXECUTE";
+    const auditRecord = evaluated.auditRecord;
 
     return NextResponse.json(
       {
@@ -107,6 +108,41 @@ export async function POST(request: NextRequest) {
         evidence: evaluated.request.context.evidenceItems ?? [],
         expectedState: scenario.expectedState,
         expectedStateMatches: evaluated.outcome.state === scenario.expectedState,
+        decisionTrace: {
+          input: {
+            action: evaluated.request.action,
+            context: {
+              environment: evaluated.request.context.environment,
+              actor: evaluated.request.context.actor,
+              approvals: evaluated.request.context.approvals,
+              requiredApprovals: evaluated.request.context.requiredApprovals,
+              requiredFacts: evaluated.request.context.requiredFacts,
+              reversibility: evaluated.request.context.reversibility,
+              blastRadius: evaluated.request.context.blastRadius,
+              costOfWrong: evaluated.request.context.costOfWrong,
+              requestedAt: evaluated.request.context.requestedAt,
+            },
+          },
+          signals: auditRecord
+            ? {
+                explicit: auditRecord.explicitSignals,
+                reconciled: auditRecord.reconciledSignals,
+              }
+            : null,
+          reasoning: {
+            matchedPolicyCodes: evaluated.outcome.matchedRuleCodes,
+            reasonCodes: evaluated.outcome.reasonCodes,
+            policyEvaluations: evaluated.outcome.policyEvaluations,
+            advisoryStatus: evaluated.advisory.status,
+            advisorySummary: evaluated.advisory.reasoningSummary,
+          },
+          outcome: {
+            state: evaluated.outcome.state,
+            confidence: evaluated.outcome.confidence,
+            uncertainty: evaluated.outcome.uncertainty,
+            auditEventId: evaluated.auditEventId,
+          },
+        },
       },
       { status: evaluated.outcome.failureState === "AUDIT_WRITE_FAILED" ? 503 : 200 },
     );
