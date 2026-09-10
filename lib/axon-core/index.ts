@@ -1,4 +1,5 @@
 export * from "./evaluate";
+export * from "./advisory";
 export * from "./normalize";
 export * from "./policies";
 export * from "./precedence";

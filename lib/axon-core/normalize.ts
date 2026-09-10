@@ -46,6 +46,7 @@ export function normalizeDecisionRequest(input: unknown): DecisionRequest {
         stale: parsed.context.evidence?.stale ?? false,
         conflicting: parsed.context.evidence?.conflicting ?? false,
       },
+      evidenceItems: parsed.context.evidenceItems ?? [],
     },
   } satisfies DecisionRequest;
 

@@ -36,6 +36,44 @@ export type Reversibility =
 export type BlastRadius = "low" | "medium" | "high";
 export type CostOfWrong = "low" | "medium" | "high" | "critical";
 
+export type InferenceSource = "explicit" | "model_inference" | "evidence";
+
+export interface InferenceProvenance {
+  source: InferenceSource;
+  confidence: number;
+  rationale: string;
+  supportingEvidenceIds: string[];
+}
+
+export interface InferredValue<T> {
+  value: T;
+  provenance: InferenceProvenance;
+}
+
+export type EvidenceTrust = "trusted" | "untrusted" | "derived";
+
+export interface EvidenceItem {
+  id: string;
+  kind: string;
+  source: string;
+  summary: string;
+  observedAt: string;
+  validUntil: string | null;
+  trust: EvidenceTrust;
+  contentHash: string;
+  supports: string[];
+  contradicts: string[];
+}
+
+export type EvidenceAssessmentKind = "supports" | "contradicts" | "uncertain";
+
+export interface EvidenceAssessment {
+  evidenceId: string;
+  assessment: EvidenceAssessmentKind;
+  confidence: number;
+  rationale: string;
+}
+
 export interface ProposedAction {
   domain: string;
   operation: string;
@@ -63,6 +101,7 @@ export interface DecisionContext {
     stale: boolean;
     conflicting: boolean;
   };
+  evidenceItems?: EvidenceItem[];
 }
 
 export interface DecisionRequest {
@@ -134,4 +173,33 @@ export interface DecisionOutcome {
   reasonCodes: string[];
   failureState: FailureState | null;
   authoritative: "deterministic";
+}
+
+export interface AdvisoryInferredSignals {
+  normalizedAction: InferredValue<string>;
+  inferredDomain: InferredValue<string>;
+  inferredOperation: InferredValue<string>;
+  inferredTarget: InferredValue<string>;
+  inferredEnvironment: InferredValue<Environment | "unknown">;
+  destructive: InferredValue<boolean>;
+  privileged: InferredValue<boolean>;
+  externallyVisible: InferredValue<boolean>;
+  inferredReversibility: InferredValue<Reversibility | "unknown">;
+  inferredBlastRadius: InferredValue<BlastRadius | "unknown">;
+  inferredCostOfWrong: InferredValue<CostOfWrong | "unknown">;
+}
+
+export interface AdvisoryInterpretation {
+  provider: "gemini" | string;
+  model: string | null;
+  status: "success" | "unavailable" | "invalid" | "failed" | "not_requested";
+  interpretationConfidence: number;
+  inferredSignals: AdvisoryInferredSignals | null;
+  missingInformation: string[];
+  ambiguities: string[];
+  conflictingFacts: string[];
+  evidenceAssessment: EvidenceAssessment[];
+  saferAlternatives: string[];
+  reasoningSummary: string;
+  unknownEvidenceIds: string[];
 }

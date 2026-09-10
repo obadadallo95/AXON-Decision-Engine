@@ -1,6 +1,7 @@
 import {
   DecisionOutcomeSchema,
   DecisionRequestSchema,
+  DecisionSignalsSchema,
   PolicyRuleSchema,
 } from "./schemas";
 import { normalizeDecisionRequest, normalizePolicyRules } from "./normalize";
@@ -10,6 +11,7 @@ import { deriveDecisionSignals } from "./signals";
 import type {
   DecisionOutcome,
   DecisionRequest,
+  DecisionSignals,
   FailureState,
   PolicyRule,
 } from "./types";
@@ -40,6 +42,17 @@ export function evaluateDecision(
   const request = DecisionRequestSchema.parse(requestInput);
   const rules = inputRules.map((rule) => PolicyRuleSchema.parse(rule));
   const signals = deriveDecisionSignals(request);
+  return evaluateDecisionWithSignals(request, rules, signals);
+}
+
+export function evaluateDecisionWithSignals(
+  requestInput: DecisionRequest,
+  inputRules: PolicyRule[],
+  signalsInput: DecisionSignals,
+): DecisionOutcome {
+  const request = DecisionRequestSchema.parse(requestInput);
+  const rules = inputRules.map((rule) => PolicyRuleSchema.parse(rule));
+  const signals = DecisionSignalsSchema.parse(signalsInput);
   const policyEvaluations = evaluatePolicyRules(request, signals, rules);
   const state = selectDecisionState(policyEvaluations, signals);
   const matchedRuleCodes = policyEvaluations

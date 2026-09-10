@@ -16,6 +16,25 @@ function missingFacts(request: DecisionRequest): string[] {
   });
 }
 
+function evidenceState(request: DecisionRequest): {
+  stale: boolean;
+  conflicting: boolean;
+} {
+  const requestedAt = Date.parse(request.context.requestedAt);
+  const staleByValidity = (request.context.evidenceItems ?? []).some((item) => {
+    if (!item.validUntil || Number.isNaN(requestedAt)) return false;
+    const validUntil = Date.parse(item.validUntil);
+    return !Number.isNaN(validUntil) && validUntil < requestedAt;
+  });
+  const conflictByRelationship = (request.context.evidenceItems ?? []).some(
+    (item) => item.contradicts.length > 0,
+  );
+  return {
+    stale: request.context.evidence.stale || staleByValidity,
+    conflicting: request.context.evidence.conflicting || conflictByRelationship,
+  };
+}
+
 function boundedRisk(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -24,8 +43,9 @@ export function deriveDecisionSignals(
   request: DecisionRequest,
 ): DecisionSignals {
   const missingInformation = missingFacts(request);
-  const staleEvidence = request.context.evidence.stale;
-  const conflictingEvidence = request.context.evidence.conflicting;
+  const evidence = evidenceState(request);
+  const staleEvidence = evidence.stale;
+  const conflictingEvidence = evidence.conflicting;
   const requiredApprovalMissing = request.context.requiredApprovals.some(
     (required) => !request.context.approvals.includes(required),
   );

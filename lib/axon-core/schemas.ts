@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  type AdvisoryInterpretation,
+  type AdvisoryInferredSignals,
   DECISION_STATES,
   FAILURE_STATES,
   type JsonObject,
@@ -24,6 +26,118 @@ export const JsonObjectSchema: z.ZodType<JsonObject> = z.record(
 
 export const DecisionStateSchema = z.enum(DECISION_STATES);
 export const FailureStateSchema = z.enum(FAILURE_STATES);
+
+export const EvidenceItemSchema = z
+  .object({
+    id: z.string().trim().min(1).max(128),
+    kind: z.string().trim().min(1).max(80),
+    source: z.string().trim().min(1).max(200),
+    summary: z.string().trim().min(1).max(2000),
+    observedAt: z.string().trim().min(1).max(80),
+    validUntil: z.string().trim().max(80).nullable(),
+    trust: z.enum(["trusted", "untrusted", "derived"]),
+    contentHash: z.string().trim().min(1).max(256),
+    supports: z.array(z.string().trim().min(1).max(128)).max(50).default([]),
+    contradicts: z
+      .array(z.string().trim().min(1).max(128))
+      .max(50)
+      .default([]),
+  })
+  .strict();
+
+export const InferenceProvenanceSchema = z
+  .object({
+    source: z.enum(["explicit", "model_inference", "evidence"]),
+    confidence: z.number().finite().min(0).max(1),
+    rationale: z.string().trim().min(1).max(500),
+    supportingEvidenceIds: z
+      .array(z.string().trim().min(1).max(128))
+      .max(20)
+      .default([]),
+  })
+  .strict();
+
+const inferredString = z
+  .object({ value: z.string().trim().min(1).max(500), provenance: InferenceProvenanceSchema })
+  .strict();
+const inferredBoolean = z
+  .object({ value: z.boolean(), provenance: InferenceProvenanceSchema })
+  .strict();
+const inferredEnvironment = z
+  .object({
+    value: z.enum(["development", "staging", "production", "unknown"]),
+    provenance: InferenceProvenanceSchema,
+  })
+  .strict();
+const inferredReversibility = z
+  .object({
+    value: z.enum(["reversible", "partially_reversible", "irreversible", "unknown"]),
+    provenance: InferenceProvenanceSchema,
+  })
+  .strict();
+const inferredBlastRadius = z
+  .object({
+    value: z.enum(["low", "medium", "high", "unknown"]),
+    provenance: InferenceProvenanceSchema,
+  })
+  .strict();
+const inferredCostOfWrong = z
+  .object({
+    value: z.enum(["low", "medium", "high", "critical", "unknown"]),
+    provenance: InferenceProvenanceSchema,
+  })
+  .strict();
+
+export const AdvisoryInferredSignalsSchema = z
+  .object({
+    normalizedAction: inferredString,
+    inferredDomain: inferredString,
+    inferredOperation: inferredString,
+    inferredTarget: inferredString,
+    inferredEnvironment,
+    destructive: inferredBoolean,
+    privileged: inferredBoolean,
+    externallyVisible: inferredBoolean,
+    inferredReversibility,
+    inferredBlastRadius,
+    inferredCostOfWrong,
+  })
+  .strict() satisfies z.ZodType<AdvisoryInferredSignals>;
+
+export const EvidenceAssessmentSchema = z
+  .object({
+    evidenceId: z.string().trim().min(1).max(128),
+    assessment: z.enum(["supports", "contradicts", "uncertain"]),
+    confidence: z.number().finite().min(0).max(1),
+    rationale: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+const AdvisoryPayloadShape = {
+  interpretationConfidence: z.number().finite().min(0).max(1),
+  inferredSignals: AdvisoryInferredSignalsSchema,
+  missingInformation: z.array(z.string().trim().min(1).max(200)).max(20),
+  ambiguities: z.array(z.string().trim().min(1).max(500)).max(20),
+  conflictingFacts: z.array(z.string().trim().min(1).max(500)).max(20),
+  evidenceAssessment: z.array(EvidenceAssessmentSchema).max(50),
+  saferAlternatives: z.array(z.string().trim().min(1).max(1000)).max(10),
+  reasoningSummary: z.string().trim().min(1).max(2000),
+};
+
+export const GeminiAdvisoryPayloadSchema = z
+  .object(AdvisoryPayloadShape)
+  .strict();
+
+export const AdvisoryInterpretationSchema = z
+  .object({
+    provider: z.string().trim().min(1).max(80),
+    model: z.string().trim().max(160).nullable(),
+    status: z.enum(["success", "unavailable", "invalid", "failed", "not_requested"]),
+    ...AdvisoryPayloadShape,
+    inferredSignals: AdvisoryInferredSignalsSchema.nullable(),
+    unknownEvidenceIds: z.array(z.string().trim().min(1).max(128)).max(50),
+  })
+  .strict() satisfies z.ZodType<AdvisoryInterpretation>;
 
 export const EnvironmentSchema = z.enum([
   "development",
@@ -80,6 +194,7 @@ const DecisionContextShape = {
     })
     .strict()
     .default({ stale: false, conflicting: false }),
+  evidenceItems: z.array(EvidenceItemSchema).max(100).default([]),
 };
 
 export const DecisionContextSchema = z
