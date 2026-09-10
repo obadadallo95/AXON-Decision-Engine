@@ -19,8 +19,8 @@
 ## External action required
 
 - [ ] Confirm anonymous public repository access in a fresh browser
-- [ ] Deploy the demo and add the live URL
-- [ ] Run a fresh-browser smoke test against the deployed demo
+- [x] Deploy the demo and add the verified live URL
+- [x] Run a fresh-browser/live smoke test against the deployed demo
 - [ ] Record and publish the 90-second walkthrough
 - [ ] Complete the challenge submission form
 - [ ] Add verified external URLs wherever desired

@@ -50,6 +50,10 @@ Server Audit Record
 - [Deployment plan](docs/deployment.md)
 - [Submission checklist](docs/submission-checklist.md)
 
+## Submission links
+
+- Live demo: [https://axon-decision-engine.onrender.com](https://axon-decision-engine.onrender.com)
+
 ## Challenge demo
 
 The dashboard has three domains and fifteen typed scenarios:

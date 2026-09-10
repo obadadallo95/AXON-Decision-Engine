@@ -1,6 +1,6 @@
 # Challenge Deployment Plan
 
-This is a documentation-only deployment plan. No deployment is performed by this repository stage.
+This documents the single-process deployment shape. The verified challenge service currently runs at [axon-decision-engine.onrender.com](https://axon-decision-engine.onrender.com).
 
 ## Recommended shape
 
