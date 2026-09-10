@@ -16,6 +16,8 @@ graph TD
     I[AXON Web UI] -->|GET /api/audit| J[Audit API]
     J --> F
     C -->|Decision + audit identity| A
+    I -->|GET /api/scenarios| K[Scenario Catalog]
+    I -->|POST /api/scenarios/run| C
 ```
 
 The current repository uses a process-local server-owned repository. It is suitable for local and single-instance demonstrations, but it is not durable across restarts or safe as a shared store across multiple instances.
@@ -41,8 +43,27 @@ The Next.js route is intentionally thin. `server/decision-service.ts` owns the r
 - **`POST /api/decide`**: Validates structured or legacy input and returns the deterministic outcome plus `auditEventId`, `idempotencyKey`, replay status, and integrity metadata.
 - **`POST /api/review`**: Accepts only `APPROVE` or `REJECT` for an existing `ESCALATE` decision. It appends an immutable review event and never changes the original decision record.
 - **`GET /api/audit`**: Reads a decision audit trail by `requestId` or lists recent server-owned records for the dashboard.
+- **`GET /api/scenarios`**: Returns metadata only for the typed demonstration fixtures.
+- **`POST /api/scenarios/run`**: Resolves a fixture ID, runs its domain adapter and policies through the same `DecisionService`, and returns the canonical result plus expected-state comparison and audit identity. The expected state is an assertion for the demo, never an authorization input.
 
-## 5. The UI Dashboard (`app/page.tsx`)
+## 5. Domain Scenario Layer
+
+The scenario layer makes the generic kernel concrete without putting domain logic in the route or browser:
+
+```text
+typed fixture -> domain adapter -> DecisionRequest + evidence + PolicyRule[]
+                                      |
+                                      v
+                              DecisionService
+                                      |
+                         deterministic outcome + audit
+```
+
+The three domains are code deployment, refund approval, and support-ticket triage. Each has a strict input schema, declarative policy set, evidence fixtures, and five boundary cases. Adapters map domain facts to the generic fields (`requiredFacts`, `requiredApprovals`, reversibility, blast radius, cost of wrong, and evidence). Gemini remains advisory; if it is unavailable, the kernel and audit workflow remain deterministic and do not grant authority to the model.
+
+The refund fixture `refund-stale-conflicting` is intentionally a failure case: order `4815`, €4,800, stale payment evidence, a contradictory fraud relationship, three chargebacks, and missing finance approval. Signal precedence returns `ESCALATE` rather than silently executing or deferring, while the audit record preserves all conditions.
+
+## 6. The UI Dashboard (`app/page.tsx`)
 
 A React/Next.js interface designed to give human operators visibility into the system.
 - **Policy Management**: Operators can write, toggle, and delete security guardrails.

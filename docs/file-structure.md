@@ -7,6 +7,9 @@ The repository is structured to prioritize a clean separation between the server
 │   ├── api/
 │   │   ├── decide/
 │   │   │   └── route.ts         # Thin API boundary for structured and legacy decision requests.
+│   │   ├── scenarios/
+│   │   │   ├── route.ts         # Read-only metadata catalog for demo fixtures.
+│   │   │   └── run/route.ts     # Fixture adapter -> DecisionService -> audit boundary.
 │   │   ├── audit/
 │   │   │   └── route.ts         # Server-owned audit read endpoint.
 │   │   └── review/
@@ -32,7 +35,11 @@ The repository is structured to prioritize a clean separation between the server
 │   ├── firebase.ts              # Firebase client initialization.
 │   ├── firestore-service.ts     # Browser policy adapter and server-audit read/review client; no authoritative audit writes.
 │   ├── i18n.tsx                 # Core translation dictionaries and RTL logic for bilingual support.
-│   ├── scenarios.ts             # Static mocked scenarios used for rapid UI testing and demonstrations.
+│   ├── scenarios.ts             # UI compatibility projection of the server-owned scenario catalog.
+│   ├── domains/                  # Typed domain schemas, adapters, policies, evidence, and fixtures.
+│   │   ├── code-deployment/
+│   │   ├── refund-approval/
+│   │   └── support-ticket-triage/
 │   └── utils.ts                 # Utility functions (e.g. Tailwind class mergers).
 │
 ├── server/

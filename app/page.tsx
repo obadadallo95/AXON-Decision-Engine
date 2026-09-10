@@ -56,7 +56,7 @@ import {
 import { useLanguage, Language } from '../lib/i18n';
 import { useAuth, UserRole } from '../lib/auth-context';
 import { useSpeech } from '../hooks/use-speech';
-import { evaluationScenarios } from '../lib/scenarios';
+import { evaluationScenarios, type EvaluationScenario } from '../lib/scenarios';
 import { 
   fetchAuditHistory, 
   fetchEscalatedQueue, 
@@ -67,6 +67,27 @@ import {
   EscalatedItem,
   SecurityPolicy
 } from '../lib/firestore-service';
+
+const EMPTY_ANALYSIS = {
+  decision: 'NOT_RUN',
+  state: null,
+  riskScore: 0,
+  confidence: 0,
+  uncertainty: [],
+  missingInformation: [],
+  matchedPolicyCodes: [],
+  citations: [],
+  evidence: [],
+  auditEventId: null,
+  reasonEn: 'Select a domain scenario and run it through the AXON server.',
+  reasonAr: 'اختر سيناريو مجال وشغّله عبر خادم أكسون.',
+  mitigationEn: 'No action has been evaluated yet.',
+  mitigationAr: 'لم يتم تقييم أي إجراء بعد.',
+  groundingEn: 'No advisory or evidence trace exists until the server evaluates a request.',
+  groundingAr: 'لا توجد استشارة أو أدلة قبل أن يقيّم الخادم الطلب.',
+  requestClassificationEn: 'Not run',
+  requestClassificationAr: 'لم يُشغّل',
+};
 
 export default function AXONDashboard() {
   const { language, setLanguage, t } = useLanguage();
@@ -97,8 +118,9 @@ export default function AXONDashboard() {
   const [activeTab, setActiveTab] = useState<'workspace' | 'audit' | 'queue' | 'policies' | 'sdk'>('workspace');
 
   // Input states
-  const [prompt, setPrompt] = useState('Upgrade the production payment-gateway library from v2.4 to v3.0.1 immediately.');
-  const [category, setCategory] = useState('dependency');
+  const [prompt, setPrompt] = useState('');
+  const [category, setCategory] = useState('code-deployment');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
   
   // Data lists
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -117,20 +139,10 @@ export default function AXONDashboard() {
   const [isDecisionOutputMaximized, setIsDecisionOutputMaximized] = useState(false);
   
   // Active Analysis State
-  const [activeAnalysis, setActiveAnalysis] = useState<any>({
-    decision: 'ESCALATE_TO_HUMAN',
-    riskScore: 85,
-    reasonEn: "The requested version (v3.0.1) contains breaking changes to the `ProcessTransaction` signature that will cause production downtime if applied without code migration.",
-    reasonAr: "تحتوي النسخة المطلوبة (v3.0.1) على تغييرات جذرية في توقيع `ProcessTransaction` مما قد يؤدي إلى تعطل العمليات بالإنتاج إذا تم تطبيقها دون مراجعة برمجية مسبقة.",
-    mitigationEn: "Apply minor patch v2.4.8 instead. It addresses current CVEs without breaking the API contract.",
-    mitigationAr: "قم بتطبيق الرقعة الطفيفة v2.4.8 بدلاً من ذلك. فهي تعالج الثغرات الأمنية الحالية دون كسر عقد الواجهة البرمجية (API).",
-    groundingEn: "v3.0.0 introduced a significant change to PCI-DSS compliance handling. Users report 40% failure rates on legacy payloads.",
-    groundingAr: "قدم الإصدار v3.0.0 تغييراً جوهرياً في معالجة امتثال PCI-DSS. أبلغ المستخدمون عن معدلات فشل تبلغ 40٪ في الحزم القديمة.",
-    citations: ["https://nvd.nist.gov/vuln", "https://github.com/advisories"]
-  });
+  const [activeAnalysis, setActiveAnalysis] = useState<any>(EMPTY_ANALYSIS);
 
   // Arabic Translation preview helper
-  const [arabicPreview, setArabicPreview] = useState('تتم مراجعة طلب ترقية مكتبة بوابة الدفع حالياً. تم اكتشاف مخاطر أمنية تتطلب تدخلاً بشرياً فورياً نظراً لحساسية النظام.');
+  const [arabicPreview, setArabicPreview] = useState('لم يتم تشغيل أي سيناريو بعد.');
 
   // Custom policy form
   const [newPolicyCode, setNewPolicyCode] = useState('');
@@ -166,21 +178,22 @@ export default function AXONDashboard() {
   useEffect(() => {
     if (transcript) {
       const timer = setTimeout(() => {
+        setSelectedScenarioId(null);
         setPrompt(transcript);
       }, 0);
       return () => clearTimeout(timer);
     }
   }, [transcript]);
 
-  // Synchronize scenario language automatically when toggling language
+  // Synchronize the selected fixture preview when toggling language.
   useEffect(() => {
-    const matchingScenario = evaluationScenarios.find(
-      s => s.promptEn === prompt || s.promptAr === prompt || s.prompt === prompt
-    );
+    if (!selectedScenarioId) return;
+    const matchingScenario = evaluationScenarios.find((scenario) => scenario.id === selectedScenarioId);
     if (matchingScenario) {
       setPrompt(language === 'en' ? matchingScenario.promptEn : matchingScenario.promptAr);
+      setArabicPreview(matchingScenario.promptAr);
     }
-  }, [language]);
+  }, [language, selectedScenarioId]);
 
   // Declare hoisted async function first
   const loadDatabaseData = React.useCallback(async () => {
@@ -205,22 +218,12 @@ export default function AXONDashboard() {
     loadDatabaseData();
   }, [activeTab, loadDatabaseData]);
 
-  // Sync Arabic Preview translation based on user prompt using a quick debounce or trigger
+  // Keep the manual request preview honest when no fixture is selected.
   useEffect(() => {
-    if (!prompt) return;
-    const lower = prompt.toLowerCase();
-    if (lower.includes('upgrade') || lower.includes('payment')) {
-      setArabicPreview('ترقية مكتبة بوابة الدفع لبيئة الإنتاج فورياً من الإصدار v2.4 إلى v3.0.1.');
-    } else if (lower.includes('truncate') || lower.includes('modify')) {
-      setArabicPreview('حذف بيانات جدول ملفات العملاء المؤقت وتعديل نوع حقل المعرف الرقمي للمستخدمين.');
-    } else if (lower.includes('hotfix') || lower.includes('patch')) {
-      setArabicPreview('نشر رقعة الإصلاح الأمني الطارئ لبيئة الإنتاج لمعالجة الثغرة الأمنية في سيرفرات السداد.');
-    } else if (lower.includes('ssh') || lower.includes('access')) {
-      setArabicPreview('منح صلاحيات وصول مؤقتة للسيرفرات عبر مفتاح SSH الخارجي دون توقيع ثنائي معتمد.');
-    } else {
-      setArabicPreview('طلب إجراء أمني نشط: ' + prompt);
+    if (!selectedScenarioId) {
+      setArabicPreview(prompt ? 'معاينة عربية للطلب اليدوي: ' + prompt : 'لم يتم تشغيل أي سيناريو بعد.');
     }
-  }, [prompt]);
+  }, [prompt, selectedScenarioId]);
 
   // Submit action request to evaluation API
   const handleEvaluate = async (customPrompt?: string) => {
@@ -232,20 +235,23 @@ export default function AXONDashboard() {
     }
 
     const targetPrompt = customPrompt || prompt;
-    if (!targetPrompt.trim()) return;
+    const selectedScenario = selectedScenarioId
+      ? evaluationScenarios.find((scenario) => scenario.id === selectedScenarioId)
+      : null;
+    if (!selectedScenario && !targetPrompt.trim()) return;
 
     setIsEvaluating(true);
     setNotification('');
 
     try {
-      // Send active guidelines from local state
-      const response = await fetch('/api/decide', {
+      const response = await fetch(selectedScenario ? '/api/scenarios/run' : '/api/decide', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: targetPrompt,
-          policies: policies
-        })
+        body: JSON.stringify(
+          selectedScenario
+            ? { scenarioId: selectedScenario.id }
+            : { prompt: targetPrompt, policies },
+        ),
       });
 
       if (!response.ok) {
@@ -335,9 +341,11 @@ export default function AXONDashboard() {
   };
 
   // Quick helper to load scenario
-  const handleLoadScenario = (scen: any) => {
-    setPrompt(scen.prompt);
-    setCategory(scen.category);
+  const handleLoadScenario = (scen: EvaluationScenario) => {
+    setSelectedScenarioId(scen.id);
+    setPrompt(language === 'en' ? scen.promptEn : scen.promptAr);
+    setCategory(scen.domain);
+    setActiveAnalysis(EMPTY_ANALYSIS);
   };
 
   // Administrative Quick Action Handlers
@@ -452,7 +460,7 @@ export default function AXONDashboard() {
     if (auditSearch && !log.prompt.toLowerCase().includes(auditSearch.toLowerCase()) && !log.category.toLowerCase().includes(auditSearch.toLowerCase())) {
       return false;
     }
-    if (auditFilterDecision !== 'ALL' && log.decision !== auditFilterDecision && log.reviewerOverride !== auditFilterDecision) {
+    if (auditFilterDecision !== 'ALL' && log.state !== auditFilterDecision && log.decision !== auditFilterDecision && log.reviewerOverride !== auditFilterDecision) {
       return false;
     }
     return true;
@@ -586,6 +594,16 @@ export default function AXONDashboard() {
   // Get status color utilities
   const getDecisionStyles = (decision: string) => {
     switch(decision) {
+      case 'NOT_RUN':
+        return {
+          bg: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+          badge: 'bg-slate-500/15 text-slate-400 border border-slate-500/30',
+          strip: 'bg-slate-500',
+          icon: <Clock className="w-5 h-5 text-slate-400" />,
+          labelEn: 'Select a scenario',
+          labelAr: 'اختر سيناريو'
+        };
+      case 'EXECUTE':
       case 'ALLOW':
         return {
           bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -595,6 +613,7 @@ export default function AXONDashboard() {
           labelEn: 'Allow Action',
           labelAr: 'السماح بالإجراء'
         };
+      case 'REFUSE':
       case 'DENY':
         return {
           bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
@@ -604,6 +623,7 @@ export default function AXONDashboard() {
           labelEn: 'Deny Action',
           labelAr: 'رفض الإجراء'
         };
+      case 'ASK':
       case 'NEEDS_CLARIFICATION':
         return {
           bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -613,6 +633,16 @@ export default function AXONDashboard() {
           labelEn: 'Clarify Action',
           labelAr: 'يتطلب توضيحاً'
         };
+      case 'DEFER':
+        return {
+          bg: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+          badge: 'bg-orange-500/15 text-orange-400 border border-orange-500/30',
+          strip: 'bg-orange-500',
+          icon: <Clock className="w-5 h-5 text-orange-400" />,
+          labelEn: 'Defer / Re-evaluate',
+          labelAr: 'تأجيل وإعادة التقييم'
+        };
+      case 'ESCALATE':
       case 'ESCALATE_TO_HUMAN':
       default:
         return {
@@ -626,7 +656,7 @@ export default function AXONDashboard() {
     }
   };
 
-  const activeDecision = getDecisionStyles(activeAnalysis.decision);
+  const activeDecision = getDecisionStyles(activeAnalysis.state || activeAnalysis.decision);
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-app)] overflow-hidden antialiased text-[#F3F4F6]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -1012,20 +1042,46 @@ export default function AXONDashboard() {
                     
                     <select 
                       value={category}
-                      onChange={(e) => setCategory(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedScenarioId(null);
+                        setCategory(e.target.value);
+                        setPrompt('');
+                        setActiveAnalysis(EMPTY_ANALYSIS);
+                      }}
                       className="text-xs border border-[var(--border-muted)]/80 bg-[var(--bg-surface)] font-bold text-[var(--text-main)] px-3 py-2 rounded-xl outline-none cursor-pointer focus:ring-1 focus:ring-[#6366F1] transition-all"
                     >
-                      <option value="dependency">{language === 'en' ? 'Software Dependency Update' : 'تحديث الاعتمادات البرمجية'}</option>
-                      <option value="database">{language === 'en' ? 'Database Schema Modification' : 'تعديل مخطط البيانات'}</option>
-                      <option value="access">{language === 'en' ? 'Server Access Management' : 'صلاحيات وسيرفرات الوصول'}</option>
-                      <option value="patch">{language === 'en' ? 'Emergency Security Hotfix' : 'الإصلاحات الأمنية الطارئة'}</option>
+                      <option value="code-deployment">{language === 'en' ? 'Code Deployment' : 'نشر الشيفرة'}</option>
+                      <option value="refund-approval">{language === 'en' ? 'Refund Approval' : 'اعتماد الاسترداد'}</option>
+                      <option value="support-ticket-triage">{language === 'en' ? 'Support Ticket Triage' : 'فرز تذاكر الدعم'}</option>
                     </select>
                   </div>
+
+                  {selectedScenarioId && (() => {
+                    const selectedScenario = evaluationScenarios.find((scenario) => scenario.id === selectedScenarioId);
+                    return selectedScenario ? (
+                      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2.5 text-[11px] text-[var(--text-muted)]">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-bold text-indigo-300">
+                            {language === 'en' ? selectedScenario.titleEn : selectedScenario.titleAr}
+                          </span>
+                          <span className="rounded-md border border-indigo-500/30 px-2 py-0.5 text-[9px] font-bold uppercase text-indigo-300">
+                            {language === 'en' ? `Expected ${selectedScenario.expectedState}` : `المتوقع ${selectedScenario.expectedState}`}
+                          </span>
+                        </div>
+                        <p className="mt-1 leading-relaxed">
+                          {language === 'en' ? selectedScenario.descriptionEn : selectedScenario.descriptionAr}
+                        </p>
+                      </div>
+                    ) : null;
+                  })()}
 
                   <div className="relative group">
                     <textarea 
                       value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedScenarioId(null);
+                        setPrompt(e.target.value);
+                      }}
                       className="w-full h-40 p-5 bg-[var(--bg-surface)]/85 border border-[var(--border-muted)]/80 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-[#6366F1]/50 focus:border-[#6366F1] placeholder-[var(--text-muted)] text-sm text-[var(--text-main)] leading-relaxed font-mono shadow-inner transition-all"
                       placeholder={t.inputPlaceholder}
                     />
@@ -1074,8 +1130,8 @@ export default function AXONDashboard() {
                   </p>
                   
                   <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-800">
-                    {evaluationScenarios.map((scen) => {
-                      const isSelected = prompt === (language === 'en' ? scen.promptEn : scen.promptAr);
+                    {evaluationScenarios.filter((scen) => scen.domain === category).map((scen) => {
+                      const isSelected = selectedScenarioId === scen.id;
                       return (
                         <button
                           key={scen.id}
@@ -1086,13 +1142,21 @@ export default function AXONDashboard() {
                               : 'border-[var(--border-subtle)]/60 hover:border-[var(--border-bold)] hover:bg-[var(--bg-nav-hover)]/60'
                           }`}
                         >
-                          <span className="text-[9px] uppercase font-bold text-[#818CF8] tracking-wider">
-                            {scen.category}
-                          </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] uppercase font-bold text-[#818CF8] tracking-wider">
+                              {scen.domain}
+                            </span>
+                            <span className="text-[9px] font-bold uppercase text-[var(--text-light)]">
+                              {scen.expectedState}
+                            </span>
+                          </div>
                           <span className={`line-clamp-1 font-semibold text-[11px] transition-colors ${
                             isSelected ? 'text-[var(--text-main)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-main)]'
                           }`}>
                             {language === 'en' ? scen.titleEn : scen.titleAr}
+                          </span>
+                          <span className="line-clamp-2 text-[10px] leading-relaxed text-[var(--text-light)]">
+                            {language === 'en' ? scen.descriptionEn : scen.descriptionAr}
                           </span>
                         </button>
                       );
@@ -1154,6 +1218,22 @@ export default function AXONDashboard() {
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
                       <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Canonical State' : 'الحالة الأساسية'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate">{activeAnalysis.state || 'NOT_RUN'}</span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Confidence / Completeness' : 'الثقة / الاكتمال'}</span>
+                        <span className="font-semibold text-[var(--text-main)]">{typeof activeAnalysis.confidence === 'number' ? `${Math.round(activeAnalysis.confidence * 100)}%` : '—'}</span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Reversibility' : 'قابلية التراجع'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate">{activeAnalysis.reversibility || '—'}</span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Blast / Cost' : 'النطاق / التكلفة'}</span>
+                        <span className="font-semibold text-[var(--text-main)] truncate">{activeAnalysis.blastRadius || '—'} / {activeAnalysis.costOfWrong || '—'}</span>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
                         <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Classification' : 'تصنيف الطلب'}</span>
                         <span className="font-semibold text-[var(--text-main)] truncate" title={language === 'en' ? activeAnalysis.requestClassificationEn : activeAnalysis.requestClassificationAr}>
                           {language === 'en' ? (activeAnalysis.requestClassificationEn || 'Unknown') : (activeAnalysis.requestClassificationAr || 'غير معروف')}
@@ -1168,14 +1248,24 @@ export default function AXONDashboard() {
                       <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
                         <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Supplied Evidence' : 'الأدلة المقدمة'}</span>
                         <span className="font-semibold text-[var(--text-main)] truncate">
-                          {(activeAnalysis.citations && activeAnalysis.citations.length > 0) ? (language === 'en' ? 'Utilized' : 'مستخدم') : (language === 'en' ? 'Not Required' : 'غير مطلوب')}
+                          {activeAnalysis.evidence?.length ? `${activeAnalysis.evidence.length} item(s)` : (language === 'en' ? 'Not supplied' : 'غير مقدم')}
                         </span>
                       </div>
                       <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg flex flex-col gap-1">
                         <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Human Review' : 'المراجعة البشرية'}</span>
                         <span className="font-semibold text-[var(--text-main)] truncate">
-                          {activeAnalysis.decision === 'ESCALATE_TO_HUMAN' ? (language === 'en' ? 'Required' : 'مطلوب') : (language === 'en' ? 'Bypassed' : 'تم التجاوز')}
+                          {activeAnalysis.state === 'ESCALATE' ? (language === 'en' ? 'Required' : 'مطلوب') : (activeAnalysis.state ? (language === 'en' ? 'Not required' : 'غير مطلوب') : '—')}
                         </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">{language === 'en' ? 'Missing Information' : 'المعلومات الناقصة'}</span>
+                        <p className="mt-1 font-semibold text-amber-300">{activeAnalysis.missingInformation?.length ? activeAnalysis.missingInformation.join(', ') : (language === 'en' ? 'None' : 'لا يوجد')}</p>
+                      </div>
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border-muted)]/60 p-2.5 rounded-lg">
+                        <span className="text-[var(--text-muted)] uppercase font-bold tracking-widest text-[8px]">Audit Event ID</span>
+                        <p className="mt-1 truncate font-mono font-semibold text-[var(--text-main)]" title={activeAnalysis.auditEventId || undefined}>{activeAnalysis.auditEventId || (language === 'en' ? 'Not recorded' : 'لم يسجل')}</p>
                       </div>
                     </div>
                   </div>
@@ -1222,10 +1312,10 @@ export default function AXONDashboard() {
                   <div className="flex justify-between items-center border-b border-[var(--border-subtle)]/60 pb-3">
                     <span className="text-xs font-bold text-[#818CF8] uppercase tracking-wider flex items-center gap-2">
                       <Globe className="w-4 h-4 text-indigo-400" />
-                      {language === 'en' ? 'Verified Grounding Data' : 'التحقق والمصادر الموثقة'}
+                      {language === 'en' ? 'Evidence & Advisory Trace' : 'تتبع الأدلة والاستشارة'}
                     </span>
                     <span className="text-[9px] uppercase font-bold px-2 py-0.5 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-md">
-                      {t.googleSearchUsed}
+                      {activeAnalysis.advisoryInterpretation?.status || (activeAnalysis.state ? 'deterministic' : 'not run')}
                     </span>
                   </div>
 
@@ -1233,6 +1323,22 @@ export default function AXONDashboard() {
                     <p className="text-xs text-[var(--text-muted)] italic leading-relaxed">
                       &ldquo;{language === 'en' ? activeAnalysis.groundingEn : activeAnalysis.groundingAr}&rdquo;
                     </p>
+
+                    <div className="border-t border-[var(--border-muted)]/60 pt-3">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-300">
+                        {language === 'en' ? 'Gemini advisory summary' : 'ملخص استشارة Gemini'}
+                      </span>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-light)]">
+                        {activeAnalysis.advisoryInterpretation?.reasoningSummary || (language === 'en' ? 'No advisory has been requested yet.' : 'لم يتم طلب استشارة بعد.')}
+                      </p>
+                    </div>
+
+                    {activeAnalysis.evidence?.length > 0 && (
+                      <div className="border-t border-[var(--border-muted)]/60 pt-3 text-[10px] text-[var(--text-light)]">
+                        <span className="font-bold uppercase tracking-wider text-[var(--text-muted)]">{language === 'en' ? 'Evidence IDs' : 'معرّفات الأدلة'}</span>
+                        <p className="mt-1 font-mono leading-relaxed">{activeAnalysis.evidence.map((item: { id: string }) => item.id).join(', ')}</p>
+                      </div>
+                    )}
                     
                     {activeAnalysis.citations && activeAnalysis.citations.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-[var(--border-muted)]/60">
@@ -1255,8 +1361,8 @@ export default function AXONDashboard() {
 
                 <div className="text-[10px] text-[var(--text-light)] leading-relaxed font-medium">
                   {language === 'en'
-                    ? "Information is cross-referenced in real-time with trusted vulnerability directories and semantic models to assure full regulatory compliance."
-                    : "يتم فحص ومقارنة المعلومات في الوقت الفعلي مع فهارس الثغرات الأمنية والنماذج الدلالية الموثقة لضمان الامتثال التنظيمي الكامل."}
+                    ? "This panel shows only supplied scenario evidence and bounded Gemini advisory output. Gemini and external sources are never authoritative."
+                    : "تعرض هذه اللوحة أدلة السيناريو المقدمة ومخرجات استشارة Gemini المحدودة فقط. لا يمثل Gemini أو أي مصدر خارجي مرجعاً حتمياً."}
                 </div>
               </div>
 
@@ -1596,9 +1702,11 @@ export default function AXONDashboard() {
                   className="bg-[var(--bg-input)] border border-[var(--border-input)] rounded-lg px-4 py-2 text-xs text-[var(--text-main)] outline-none focus:border-[#6366F1]"
                 >
                   <option value="ALL">{language === 'en' ? 'All Decisions' : 'كل القرارات'}</option>
-                  <option value="ALLOW">ALLOW</option>
-                  <option value="DENY">DENY</option>
-                  <option value="ESCALATE_TO_HUMAN">ESCALATE</option>
+                  <option value="EXECUTE">EXECUTE</option>
+                  <option value="ASK">ASK</option>
+                  <option value="DEFER">DEFER</option>
+                  <option value="ESCALATE">ESCALATE</option>
+                  <option value="REFUSE">REFUSE</option>
                 </select>
               </div>
 
@@ -1609,7 +1717,7 @@ export default function AXONDashboard() {
               ) : (
                 <div className="space-y-4">
                   {filteredLogs.map((log) => {
-                    const status = getDecisionStyles(log.reviewerOverride || log.decision);
+                    const status = getDecisionStyles(log.reviewerOverride || log.state || log.decision);
                     return (
                       <div 
                         key={log.id} 
@@ -1620,6 +1728,9 @@ export default function AXONDashboard() {
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] uppercase font-bold bg-[var(--bg-active)] border border-[var(--border-button)] px-2 py-0.5 rounded text-[#818CF8]">
                                 {log.category}
+                              </span>
+                              <span className="text-[9px] uppercase font-bold text-[var(--text-light)]">
+                                {log.state}
                               </span>
                               <span className="text-[10px] text-[var(--text-light)]">
                                 {new Date(log.timestamp).toLocaleString()}

@@ -49,6 +49,24 @@ interface DecisionResult {
 
 The legacy payload is compatibility-oriented. Structured callers should include a stable `requestId`, full typed context, and an `idempotencyKey`; the response's `authoritativeDecision` and integrity metadata are the server-owned result. Gemini interpretation is advisory only. `POST /api/review` and `GET /api/audit` expose the append-only review trail and audit history.
 
+### Multi-domain scenario API
+
+The demo layer exposes three real challenge domains through the same kernel:
+
+- `code-deployment`: signed artifacts, release checks, freeze windows, change tickets, and production approvals.
+- `refund-approval`: order identity, payment status, refund thresholds, duplicate payouts, fraud signals, and finance approval.
+- `support-ticket-triage`: ticket/tenant context, severity, routing availability, authorization, and security review.
+
+`GET /api/scenarios` returns metadata without fixture internals. `POST /api/scenarios/run` accepts `{ "scenarioId": "..." }` and returns the actual decision response plus `scenario`, `evidence`, `policyCodes`, `policyVersion`, `expectedState`, `expectedStateMatches`, and `auditEventId`.
+
+```bash
+curl -X POST http://localhost:3000/api/scenarios/run \
+  -H "Content-Type: application/json" \
+  -d '{"scenarioId":"deploy-human-approval"}'
+```
+
+The scenario's `expectedState` is demo validation metadata only. It is not read by the policy kernel and cannot select an outcome. `ESCALATE` results enter the normal append-only review flow; other states do not expose approval shortcuts. The `refund-stale-conflicting` fixture is intentionally safe: it models a €4,800 refund for order `4815` with stale/conflicting evidence, three chargebacks, and missing approval, and must never execute.
+
 ---
 
 ## 2. TypeScript SDK

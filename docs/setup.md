@@ -84,6 +84,24 @@ Repeat structured requests with the same `idempotencyKey` to replay the original
 
 Audit records are written on the server before a normal decision is returned. If that write is unavailable, AXON withholds `EXECUTE` and returns `AUDIT_WRITE_FAILED`. Only `ESCALATE` decisions can receive an append-only `APPROVE` or `REJECT` event through `POST /api/review`; the original decision is never mutated.
 
+### Run the multi-domain fixtures
+
+The dashboard's scenario selector calls the same server workflow as external callers. The read-only catalog can also be inspected directly:
+
+```bash
+curl http://localhost:3000/api/scenarios
+```
+
+Run a fixture by ID. The response includes the actual canonical state, advisory status, evidence, policy codes, expected-state comparison, and `auditEventId`:
+
+```bash
+curl -X POST http://localhost:3000/api/scenarios/run \
+  -H "Content-Type: application/json" \
+  -d '{"scenarioId":"refund-stale-conflicting"}'
+```
+
+The deliberate refund fixture should return `ESCALATE`, not `EXECUTE`, and should expose stale/conflicting evidence, missing approval, critical cost of wrong, and a server audit identity. A Gemini outage is represented as an unavailable advisory; it cannot authorize a scenario.
+
 ---
 
 ## 3. Production Deployment

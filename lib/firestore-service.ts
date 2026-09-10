@@ -12,6 +12,7 @@ export interface AuditLog {
   category: string;
   timestamp: any;
   decision: 'ALLOW' | 'DENY' | 'NEEDS_CLARIFICATION' | 'ESCALATE_TO_HUMAN';
+  state: 'EXECUTE' | 'ASK' | 'DEFER' | 'ESCALATE' | 'REFUSE';
   riskScore: number;
   reasonEn: string;
   reasonAr: string;
@@ -133,6 +134,7 @@ function auditLogFromRecord(record: ServerAuditRecord): AuditLog {
     category: record.normalizedRequest.action.domain,
     timestamp: new Date(record.timestamp),
     decision: legacyDecision(record.authoritativeOutcome.state),
+    state: record.authoritativeOutcome.state,
     riskScore: record.authoritativeOutcome.riskScore,
     reasonEn: `Server audit record ${record.eventId} preserves the authoritative ${record.authoritativeOutcome.state} decision.`,
     reasonAr: `يحفظ سجل الخادم القرار الحتمي ${record.authoritativeOutcome.state}.`,

@@ -33,6 +33,7 @@ By offloading authorization logic to AXON, your agents remain decoupled from cor
 - **Bounded Gemini Interpretation:** Structures natural-language intent and evidence without granting the model decision or policy authority.
 - **Server-Owned Audit Trail:** Persists the normalized request, signals, policy hash, outcome hash, and append-only review events before returning a decision.
 - **Bilingual Reasoning:** Generates objective analyses and reasoning in both English and native Arabic.
+- **Three-domain scenario runner:** Demonstrates code deployment, refund approval, and support-ticket triage through the same server decision kernel.
 
 ## The Decision Output
 
@@ -51,10 +52,12 @@ Legacy clients still receive `ALLOW`, `DENY`, `NEEDS_CLARIFICATION`, and `ESCALA
 
 To quickly evaluate the core Decision Engine, follow these steps:
 1. **Open the Workspace:** Launch the local server and navigate to `http://localhost:3000`.
-2. **Run a Safe Structured Request:** Use the API with complete typed context and verify the canonical state is `EXECUTE` (legacy `ALLOW`).
-3. **Run a Risky Request:** Supply a hard `REFUSE` policy for a destructive action and verify the canonical state is `REFUSE` (legacy `DENY`).
-4. **Run an Ambiguous Request:** Send the legacy `restart the server` payload without specifying the environment. Observe the safe `ASK` state (legacy `NEEDS_CLARIFICATION`).
-5. **Review Audit Trail:** Check the UI dashboard's event ledger, which reads server-owned audit records and review history.
+2. **Choose a domain:** Use the focused selector for Code Deployment, Refund Approval, or Support Ticket Triage, then choose one of its five typed fixtures.
+3. **Compare boundaries:** The fixture catalog demonstrates `EXECUTE`, `ASK`, `DEFER`, `ESCALATE`, and `REFUSE` without selecting outcomes by scenario ID.
+4. **Inspect the trace:** Each run displays the canonical outcome, risk/completeness, reversibility, blast radius, cost of wrong, missing information, matched policies, evidence, advisory status, and audit event ID.
+5. **Review escalations:** `ESCALATE` scenarios appear in the real Review Queue and can only be approved or rejected through the append-only review API.
+
+The deliberately difficult `refund-stale-conflicting` fixture models order `4815` and a €4,800 refund with stale payment evidence, contradictory fraud evidence, three prior chargebacks, and missing finance approval. It safely returns `ESCALATE`; it never executes a payout.
 
 ---
 
@@ -197,9 +200,12 @@ Enforces policy-compliant execution for Antigravity autonomous agents.
 - `app/api/decide/route.ts`: Thin decision API preserving legacy fields while calling the server decision service.
 - `app/api/audit/route.ts`: Server-owned audit read endpoint.
 - `app/api/review/route.ts`: Strict append-only review endpoint for ESCALATE decisions.
+- `app/api/scenarios/route.ts`: Read-only metadata catalog for the three demo domains.
+- `app/api/scenarios/run/route.ts`: Loads a fixture, adapts it to `DecisionRequest`, and runs the normal decision/audit workflow.
 - `server/decision-service.ts`: Validation, idempotency, bounded advisory orchestration, deterministic evaluation, and audit persistence.
 - `server/audit-repository.ts`: Process-local server-owned demo repository with atomic idempotency/review behavior.
 - `server/hash.ts`: Stable canonical JSON and SHA-256 artifact hashing.
+- `lib/domains/`: Strict domain schemas, adapters, policies, evidence, and scenario fixtures.
 - `app/page.tsx`: The localized (EN/AR), real-time visualization and simulation dashboard.
 - `lib/axon-sdk.ts`: The minimal TypeScript SDK for external consumption.
 - `lib/firestore-service.ts`: Browser read adapter for server audit data and existing policy display storage; it cannot create authoritative decision records.
@@ -217,6 +223,8 @@ For deep-dive technical details, explore the documentation:
 - [Complete Setup Guide](docs/setup.md)
 - [Detailed File Structure](docs/file-structure.md)
 - [Product Roadmap](docs/roadmap.md)
+
+The scenario API is documented with examples in [SDK & API Reference](docs/sdk-reference.md).
 
 ---
 
