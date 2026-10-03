@@ -1124,6 +1124,17 @@ export default function AXONDashboard() {
                       <span className={`px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase border ${activeDecision.badge}`}>
                         {activeAnalysis.state || (language === 'en' ? 'READY' : 'جاهز للتقييم')}
                       </span>
+                      {activeAnalysis.enforcement && (
+                        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider border ${
+                          activeAnalysis.enforcement.worldStateChanged
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-slate-500/30 bg-slate-500/10 text-slate-300'
+                        }`}>
+                          {activeAnalysis.enforcement.worldStateChanged
+                            ? (language === 'en' ? 'State changed' : 'تغيرت الحالة')
+                            : (language === 'en' ? 'No mutation' : 'دون تغيير')}
+                        </span>
+                      )}
                     </div>
                   </div>
 
