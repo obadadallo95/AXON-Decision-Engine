@@ -62,6 +62,13 @@ The dashboard has three domains and fifteen typed scenarios:
 - Refund Approval
 - Support Ticket Triage
 
+Each scenario also exposes an **Enforced World** proof. When AXON returns `EXECUTE`,
+a bounded in-memory executor shows the permitted state change; when it returns `ASK`,
+`DEFER`, `ESCALATE`, or `REFUSE`, the proof shows that no downstream mutation occurred.
+This executor is explicitly simulated and never performs a real refund, deployment, or
+tool action. The point is to make the authorization boundary observable without claiming
+production side effects.
+
 For a fast 90-second path, run:
 
 1. Safe staging release → `EXECUTE`

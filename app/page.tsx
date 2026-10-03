@@ -1233,6 +1233,81 @@ export default function AXONDashboard() {
                     </details>
                   </div>
 
+                  {/* ENFORCED WORLD: AXON proves what changed, or what it protected. */}
+                  {activeAnalysis.state && activeAnalysis.enforcement && (
+                    <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-[var(--bg-surface)] to-purple-500/5 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                            <Activity className="w-3.5 h-3.5" />
+                            {language === 'en' ? 'Enforced World' : 'العالم الخاضع للضبط'}
+                          </h4>
+                          <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-light)]">
+                            {language === 'en'
+                              ? 'A safe, deterministic proof of what the controlled executor may change.'
+                              : 'إثبات آمن وحتمي لما يستطيع المنفذ الخاضع للضبط تغييره.'}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-lg border px-2 py-1 text-[8px] font-black uppercase tracking-wider ${
+                          activeAnalysis.enforcement.worldStateChanged
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-[var(--border-muted)] bg-[var(--bg-surface)] text-[var(--text-dim)]'
+                        }`}>
+                          {activeAnalysis.enforcement.worldStateChanged
+                            ? (language === 'en' ? 'State changed' : 'تغيرت الحالة')
+                            : (language === 'en' ? 'No mutation' : 'دون تغيير')}
+                        </span>
+                      </div>
+                      <div className="inline-flex rounded-md border border-indigo-400/20 bg-indigo-400/5 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-indigo-200">
+                        {language === 'en' ? 'Simulated executor · no external side effects' : 'منفذ محاكى · دون آثار خارجية'}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[9px]">
+                        <div className="rounded-lg border border-[var(--border-muted)]/60 bg-[var(--bg-surface)]/80 p-2.5">
+                          <span className="font-bold uppercase tracking-widest text-[var(--text-muted)]">Executor</span>
+                          <p className="mt-1 font-semibold text-[var(--text-main)]">{activeAnalysis.enforcement.operation}</p>
+                        </div>
+                        <div className="rounded-lg border border-[var(--border-muted)]/60 bg-[var(--bg-surface)]/80 p-2.5">
+                          <span className="font-bold uppercase tracking-widest text-[var(--text-muted)]">Attempted</span>
+                          <p className="mt-1 font-semibold text-[var(--text-main)]">{activeAnalysis.enforcement.attempted ? 'Yes' : 'No'}</p>
+                        </div>
+                        <div className="rounded-lg border border-[var(--border-muted)]/60 bg-[var(--bg-surface)]/80 p-2.5">
+                          <span className="font-bold uppercase tracking-widest text-[var(--text-muted)]">Executed</span>
+                          <p className="mt-1 font-semibold text-[var(--text-main)]">{activeAnalysis.enforcement.executed ? 'Yes' : 'No'}</p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-[var(--border-muted)]/60 bg-[var(--bg-surface)]/50 p-2.5 text-[10px] leading-relaxed text-[var(--text-light)]">
+                        {activeAnalysis.enforcement.summary}
+                      </div>
+
+                      {activeAnalysis.enforcement.changes?.length > 0 ? (
+                        <div className="space-y-1">
+                          <span className="text-[8px] font-bold uppercase tracking-widest text-emerald-300">Recorded changes</span>
+                          {activeAnalysis.enforcement.changes.map((change: string) => (
+                            <p key={change} className="text-[10px] font-semibold text-emerald-200">✓ {change}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] font-semibold text-[var(--text-light)]">
+                          {language === 'en'
+                            ? 'Protected state: the downstream executor did not mutate the world.'
+                            : 'حالة محمية: المنفذ اللاحق لم يغيّر العالم.'}
+                        </p>
+                      )}
+
+                      <details className="rounded-lg border border-[var(--border-muted)]/60 bg-[var(--bg-surface)]/40 p-2.5">
+                        <summary className="cursor-pointer text-[9px] font-bold uppercase tracking-wider text-indigo-300">
+                          {language === 'en' ? 'Before → after world snapshot' : 'لقطة الحالة قبل ← بعد'}
+                        </summary>
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[9px] text-[var(--text-light)]">
+                          <pre className="overflow-auto rounded bg-black/20 p-2">{JSON.stringify(activeAnalysis.enforcement.before, null, 2)}</pre>
+                          <pre className="overflow-auto rounded bg-black/20 p-2">{JSON.stringify(activeAnalysis.enforcement.after, null, 2)}</pre>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+
                   {/* Primary Reason details */}
                   <div className="space-y-1.5">
                     <h4 className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">

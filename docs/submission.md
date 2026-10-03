@@ -19,6 +19,11 @@ Proposed Action + Context
 
 Gemini reasons. AXON authorizes. Gemini is optional and cannot clear deterministic blockers.
 
+The demo includes an Enforced World proof: a bounded simulated executor renders the
+before/after state for an authorized scenario and proves that blocked, deferred, or
+escalated scenarios leave the world unchanged. It has no external side effects; real
+execution adapters remain intentionally out of scope.
+
 ## Three domains
 
 - Code Deployment

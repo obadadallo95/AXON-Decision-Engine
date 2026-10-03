@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DecisionState } from "@/lib/axon-core";
 import { adaptScenario, getScenario, metadataOf } from "@/lib/domains";
 import { DecisionServiceError, decisionService } from "@/server/decision-service";
+import { simulateEnforcement } from "@/lib/enforcement";
 
 const ScenarioRunRequestSchema = z
   .object({
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       : "NONE";
     const metadata = metadataOf(scenario);
     const executable = evaluated.outcome.state === "EXECUTE";
+    const enforcement = simulateEnforcement(scenario.id, evaluated.outcome.state);
     const auditRecord = evaluated.auditRecord;
 
     return NextResponse.json(
@@ -76,6 +78,7 @@ export async function POST(request: NextRequest) {
         integrity: evaluated.integrity,
         decision: legacyDecision(evaluated.outcome.state),
         execute: executable,
+        enforcement,
         riskScore: evaluated.outcome.riskScore,
         confidence: evaluated.outcome.confidence,
         uncertainty: evaluated.outcome.uncertainty,
